@@ -30,6 +30,8 @@ typedef struct BootEntry{
 	u_int32_t BS_VolID;		/* Volume serial number */	
 	u_int8_t BS_VolLab[11];	/* Volume label in ASCII. User defines when creating the file system */
 	u_int8_t BS_FilSysType[8];	/* File system type label in ASCII */ 
+	u_int8_t BS_BootCode32[420]; /* Boot code, leave this empty */
+	u_int16_t BS_BootSign; /* Needs to contain 0xAA55 */
 }BootEntry;
 #pragma pack(pop) 
 
