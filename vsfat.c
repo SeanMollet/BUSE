@@ -31,7 +31,7 @@ static const u_int32_t part1_base = 1048576;
 
 static BootEntry bootentry;
 
-static u_int32_t *fat;
+static u_int32_t *fat=0;
 static u_int32_t current_fat_position=2;
 static unsigned char fat_end[] = { 0xFF, 0xFF, 0xFF, 0x0F};
 
@@ -541,13 +541,14 @@ int main (int argc, char *argv[])
 //  fprintf(stderr,"Creating virtual disk of size %llu\n",aop.size);
 
 //  data = malloc(aop.size);
+  build_mbr();
+  build_boot_sector();
+  build_fats;
   scan_folder(argv[2]);
 
   return 0;
-  build_mbr ();
-  build_boot_sector ();
-  build_fats ();
-  build_files ();
+
+//  build_files ();
   
 /*
   u_int32_t size=atoi(argv[2]); // 100;
