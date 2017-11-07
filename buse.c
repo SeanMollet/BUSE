@@ -175,7 +175,7 @@ int buse_main(const char* dev_file, const struct buse_operations *aop, void *use
        * and writes.
        */
     case NBD_CMD_READ:
-      fprintf(stderr, "Request for read of size %d\n", len);
+      fprintf(stderr, "Request for read of size %d from %llu\n", len,from);
       /* Fill with zero in case actual read is not implemented */
       chunk = malloc(len);
       if (aop->read) {
