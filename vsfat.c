@@ -512,7 +512,7 @@ static void scan_folder(char *path)
         sprintf(f_path, "%s/%s",path,dir->d_name);
         stat(f_path,&st);
         printf("%s/%s  %lu\n",path, dir->d_name,st.st_size);        
-        add_file(dir->d_name,f_path,st_size);
+        add_file(dir->d_name,f_path,st.st_size);
       }
       else{
         if(dir -> d_type == DT_DIR && strcmp(dir->d_name,".")!=0 && strcmp(dir->d_name,"..")!=0 ) // skip . and ..
