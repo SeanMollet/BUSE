@@ -86,19 +86,25 @@ static int xmp_read(void *buf, u_int32_t len, u_int64_t offset, void *userdata)
         u_int32_t usetarget;
         if(offset < address_regions[a].base){
           usepos = 0;
-          usetarget = (u_int32_t) (address_regions[a].base - offset);
+          usetarget = address_regions[a].base - offset;
           }
         else{
           usepos = offset - address_regions[a].base;
           usetarget=0;
         }
 
-        if(usepos + len > address_regions[a].length){
-          uselen = address_regions[a].length - usepos;
+        //If they're only asking for part of what we have
+        if(address_regions[a].base + address_regions[a].length >= offset+len){
+          uselen = offset+len - address_regions[a].base;
         }
-        
+
+        //Make sure we don't go off the end 
+        if(uselen > address_regions[a].length){
+          uselen = address_regions[a].length;
+        }
+                
         if (*(int *)userdata)
-          fprintf(stderr, "base: %llu uselen - %u usepos - %u usetarget - %u\n",address_regions[a].base,uselen,usepos,usetarget);
+          fprintf(stderr, "base: %#llx length: %#llx usepos: %#x offset: %#llx usetarget: %#x uselen: %#x\n",address_regions[a].base,address_regions[a].length,usepos,offset,usetarget,uselen);
         memcpy((unsigned char*) buf+usetarget,(unsigned char*) address_regions[a].mem_pointer+usepos,uselen);
         return 0;
       }
