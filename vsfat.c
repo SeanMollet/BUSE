@@ -33,10 +33,9 @@ static BootEntry bootentry;
 
 static u_int32_t *fat;
 static u_int32_t current_fat_position=2;
-static unsigned char fat_end = { 0xFF, 0xFF, 0xFF, 0x0F};
+static unsigned char fat_end[] = { 0xFF, 0xFF, 0xFF, 0x0F};
 
 static unsigned char *dirtables=0;
-static u_int32_t current_dir_fat_cluster=2;
 static u_int32_t current_dir_position=0;
 
 static AddressRegion *address_regions;
@@ -55,6 +54,7 @@ static int xmp_flush (void *userdata);
 static int xmp_trim (u_int64_t from, u_int32_t len, void *userdata);
 static void add_address_region (u_int64_t base, u_int64_t length,
 				void *mem_pointer, char *file_path);
+static u_int64_t address_from_fatclus (u_int32_t fatclus);
 static u_int32_t fat_location (u_int32_t fatnum);
 static void printBootSect (struct BootEntry bootentry);
 static u_int32_t root_dir_loc ();
@@ -405,6 +405,7 @@ static void fat_find_free()
     if(current_fat_position >= (bootentry.BPB_FATSz32 * bootentry.BPB_BytsPerSec)/4){
       return;
     }
+  }  
 }
 
 static u_int32_t ceil_div(u_int32_t x,u_int32_t y)
@@ -423,11 +424,11 @@ static int fat_new_file(unsigned char* data,char *filepath,u_int32_t length)
     //Make sure we have enough space
     u_int32_t cluster_size = (bootentry.BPB_BytsPerSec * bootentry.BPB_SecPerClus);
     u_int32_t clusters_required = ceil_div(length,cluster_size); //Ceiling division
-    if( customers_required > 
+    if( clusters_required > 
       ((bootentry.BPB_FATSz32 * bootentry.BPB_BytsPerSec)/4)-current_fat_position){ //Free clusters
         return -1;
     }
-    add_address_region (address_from_fatcluc (current_fat_position),length,data,filepath);
+    add_address_region (address_from_fatclus (current_fat_position),length,data,filepath);
     while(length>0){
       fat[current_fat_position] = current_fat_position+1;
       current_fat_position++;
@@ -453,9 +454,9 @@ static void dir_add_entry(unsigned char *entry,u_int32_t length)
   //Add another cluster
   if(current_cluster_free < length){
       fat_find_free();
-      u_int32_t used_clusters = (ceil_div(currrent_dir_positionm,entrys_per_cluster);
+      u_int32_t used_clusters = ceil_div(current_dir_position,entrys_per_cluster);
       dirtables = realloc(dirtables, cluster_size * (used_clusters+1));
-      add_address_region(address_from_fatcluc(current_fat_position),cluster_size,dirtables + (used_clusters*cluster_size),0);
+      add_address_region(address_from_fatclus(current_fat_position),cluster_size,dirtables + (used_clusters*cluster_size),0);
   }
   //copy the data in
   memcpy(dirtables + current_dir_position,entry,length);
@@ -463,10 +464,37 @@ static void dir_add_entry(unsigned char *entry,u_int32_t length)
   //Profit!   
 }
 
-static void add_files(char *name,u_int32_t start_cluster,u_int32_t size)
+static void remove_spaces(unsigned char *input,u_int32_t length)
+{
+  for(u_int32_t a=0;a<length;a++){
+    if(input[a] == 0x20){ // Space
+      input[a] = 0x5F; // _
+    }
+  }
+}
+
+static void add_file(char *name,char* filepath,u_int32_t size)
 {
   DirEntry entry;
+  //For now, just stupid 8.3
   memcpy(entry.DIR_Ext,name + strlen(name)-3,3);
+  memcpy(entry.DIR_Name,name,8);
+
+  remove_spaces(entry.DIR_Ext,3);
+  remove_spaces(entry.DIR_Name,8);
+
+  entry.DIR_Attr = 0x20; //Set the "Archive" bit
+
+  fat_find_free();
+  entry.DIR_FstClusLO = (u_int16_t) (current_fat_position & 0x00FF);
+  entry.DIR_FstClusHI = (u_int16_t) (current_fat_position & 0xFF00)>>16;
+  entry.DIR_FileSize = size;
+  
+  //dir_add_entry wants a byte array so it can have multiple entries chained together
+  //We just cast the struct pointer and tell it how many there are (1 for short filename)
+  
+  dir_add_entry((unsigned char*) &entry,1);
+  fat_new_file(0,filepath,size);
 }
 
 static void scan_folder(char *path)
@@ -478,10 +506,13 @@ static void scan_folder(char *path)
   while ((dir = readdir(d)) != NULL)
     {
       if(dir-> d_type != DT_DIR){
-        char f_path[PATH_MAX];
+        char *f_path;
+        f_path = malloc(PATH_MAX);
+        
         sprintf(f_path, "%s/%s",path,dir->d_name);
         stat(f_path,&st);
         printf("%s/%s  %lu\n",path, dir->d_name,st.st_size);        
+        add_file(dir->d_name,f_path,st_size);
       }
       else{
         if(dir -> d_type == DT_DIR && strcmp(dir->d_name,".")!=0 && strcmp(dir->d_name,"..")!=0 ) // skip . and ..
