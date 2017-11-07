@@ -1,6 +1,6 @@
 /*
- * busexmp - example memory-based block device using BUSE
- * Copyright (C) 2013 Adam Cozzette
+ * vsfat - virtual synthetic FAT filesystem on network block device from local folder
+ * Copyright (C) 2017 Sean Mollet
  *
  * This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -20,6 +20,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <dirent.h>
+#include <sys/stat.h>
 
 #include "buse.h"
 #include "vsfat.h"
@@ -29,9 +31,13 @@ static const u_int32_t part1_base = 1048576;
 
 static BootEntry bootentry;
 
-static unsigned char *fat;
-static u_int32_t current_fat_position=0;
-static unsigned char *files;
+static u_int32_t *fat;
+static u_int32_t current_fat_position=2;
+static unsigned char fat_end = { 0xFF, 0xFF, 0xFF, 0x0F};
+
+static unsigned char *dirtables=0;
+static u_int32_t current_dir_fat_cluster=2;
+static u_int32_t current_dir_position=0;
 
 static AddressRegion *address_regions;
 static u_int32_t address_regions_count;
@@ -153,7 +159,7 @@ xmp_read (void *buf, u_int32_t len, u_int64_t offset, void *userdata)
 static int
 xmp_write (const void *buf, u_int32_t len, u_int64_t offset, void *userdata)
 {
-  buf;
+  (void)buf;
   if (*(int *) userdata)
     fprintf (stderr, "W - %llu, %u\n", offset, len);
 
@@ -344,7 +350,9 @@ static u_int32_t data_loc ()
 static void build_fats ()
 {
   //These first two entries are part of the spec
-  unsigned char fatspecial[] = { 0xF8, 0xFF, 0xFF, 0x0F, 0xFF, 0xFF, 0xFF, 0x0F, 0xF8, 0xFF, 0xFF, 0x0F,0xFF, 0xFF, 0xFF, 0x0F, 0xFF, 0xFF, 0xFF, 0x0F, 0xFF, 0xFF, 0xFF, 0x0F};
+  unsigned char fatspecial[] = { 0xF8, 0xFF, 0xFF, 0x0F, 0xFF, 0xFF, 0xFF, 0x0F};
+  // 0xF8, 0xFF, 0xFF, 0x0F,0xFF, 0xFF, 0xFF, 0x0F, 0xFF, 0xFF, 0xFF, 0x0F, 0xFF, 0xFF, 0xFF, 0x0F};
+
 //  unsigned char fatfileend[] = { 0xF8, 0xFF, 0xFF, 0x0F};
   /*, 0xF8, 0xFF, 0xFF, 0x0F,	//Special entries
     0xFF, 0xFF, 0xFF, 0x0F, 0xFF, 0xFF, 0xFF, 0x0F, 0xFF, 0xFF, 0xFF, 0x0F
@@ -354,7 +362,8 @@ static void build_fats ()
   fat = malloc (bootentry.BPB_FATSz32 * bootentry.BPB_BytsPerSec);
   memset (fat, 0, bootentry.BPB_FATSz32 * bootentry.BPB_BytsPerSec);
   
-  
+  memcpy(fat,fatspecial,sizeof(fatspecial));
+    
   //For now, just map these in blind
   printf ("fat0: %llx\n", address_from_fatsec (fat_location (0)));
   printf ("fat1: %llx\n", address_from_fatsec (fat_location (1)));
@@ -377,6 +386,10 @@ unsigned char file2[] = {0x6A,0x65,0x66,0x66,0x0A,0x36,0x34,0x31,0x2D,0x37,0x38,
 unsigned char file3[] = {0x32,0x31,0x3A,0x0A,0x44,0x69,0x6D,0x73,0x75,0x6D,0x0A,0x4E,0x65,0x6C,0x73,0x6F,0x6E,0x2D,0x41,0x74,0x6B,0x69,0x6E,0x73,0x20,0x4D,0x75,0x73,0x65,0x75,0x6D,0x20,0x6F,0x66,0x20,0x41,0x72,0x74,0x0A,0x3F,0x20,0x41,0x69,0x72,0x6C,0x69,0x6E,0x65,0x20,0x48,0x69,0x73,0x74,0x6F,0x72,0x79,0x20,0x4D,0x75,0x73,0x65,0x75,0x6D,0x0A,0x51,0x33,0x39,0x0A,0x43,0x68,0x65,0x63,0x6B,0x69,0x6E,0x20,0x48,0x6F,0x74,0x65,0x6C,0x0A,0x0A,0x32,0x32,0x3A,0x20,0x0A,0x42,0x72,0x65,0x61,0x6B,0x66,0x61,0x73,0x74,0x20,0x40,0x20,0x52,0x69,0x76,0x65,0x72,0x20,0x4D,0x61,0x72,0x6B,0x65,0x74,0x0A,0x45,0x77,0x69,0x6E,0x67,0x20,0x61,0x6E,0x64,0x20,0x4D,0x75,0x72,0x69,0x65,0x6C,0x20,0x4B,0x61,0x75,0x66,0x6D,0x61,0x6E,0x20,0x4D,0x65,0x6D,0x6F,0x72,0x69,0x61,0x6C,0x20,0x47,0x61,0x72,0x64,0x65,0x6E,0x0A,0x57,0x65,0x73,0x74,0x70,0x6F,0x72,0x74,0x0A,0x50,0x68,0x6F,0x20,0x6C,0x75,0x6E,0x63,0x68,0x0A,0x50,0x6C,0x61,0x7A,0x61,0x0A,0x52,0x65,0x74,0x75,0x72,0x6E,0x20,0x68,0x6F,0x6D,0x65,0x20,0x2D,0x20,0x77,0x6F,0x72,0x6B,0x20,0x6F,0x6E,0x20,0x52,0x65,0x6E,0x27,0x73,0x20,0x73,0x74,0x75,0x66,0x66,0x0A,0x0A,0x0A,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
 
 
+(void)direntry;
+(void)file1;
+(void)file2;
+(void)file3;
 
   //files = malloc (sizeof (filedata));
   //memcpy (files, filedata, sizeof (filedata));
@@ -384,14 +397,111 @@ unsigned char file3[] = {0x32,0x31,0x3A,0x0A,0x44,0x69,0x6D,0x73,0x75,0x6D,0x0A,
   //add_address_region (part1_base + 823296, sizeof (filedata), files, 0);
 }
 
-int
-main (int argc, char *argv[])
+static void fat_find_free()
 {
-  if (argc < 2)
+  while(fat[current_fat_position] != 0){
+    current_fat_position++;
+    //Bail if we go off the end
+    if(current_fat_position >= (bootentry.BPB_FATSz32 * bootentry.BPB_BytsPerSec)/4){
+      return;
+    }
+}
+
+static u_int32_t ceil_div(u_int32_t x,u_int32_t y)
+{
+  return  (x % y) ? x / y + 1 : x / y; //Ceiling division
+}
+
+//Pass in either a memory segment or a filepath
+//This will load the proper mappings and configure the fat
+//Directory entries should be handled above here
+//This assumes we have 0 fragmentation (which should always be true, since we don't allow deleting)
+static int fat_new_file(unsigned char* data,char *filepath,u_int32_t length)
+{
+    //Get a free cluster
+    fat_find_free();
+    //Make sure we have enough space
+    u_int32_t cluster_size = (bootentry.BPB_BytsPerSec * bootentry.BPB_SecPerClus);
+    u_int32_t clusters_required = ceil_div(length,cluster_size); //Ceiling division
+    if( customers_required > 
+      ((bootentry.BPB_FATSz32 * bootentry.BPB_BytsPerSec)/4)-current_fat_position){ //Free clusters
+        return -1;
+    }
+    add_address_region (address_from_fatcluc (current_fat_position),length,data,filepath);
+    while(length>0){
+      fat[current_fat_position] = current_fat_position+1;
+      current_fat_position++;
+      length -= cluster_size;
+      }
+    memcpy(&fat[current_fat_position-1],fat_end,sizeof(fat_end)); // Terminate this chain      
+  return 0;
+}
+
+//This does accept multiple entries. However, it does not accept more than a single file worth
+static void dir_add_entry(unsigned char *entry,u_int32_t length)
+{
+  u_int32_t cluster_size = (bootentry.BPB_BytsPerSec * bootentry.BPB_SecPerClus);
+  //Make sure the DIR exists
+  if(dirtables == 0){
+    dirtables = malloc(cluster_size);
+    add_address_region(address_from_fatsec(root_dir_loc()),cluster_size,dirtables,0);
+    }
+  u_int32_t entrys_per_cluster = cluster_size/sizeof(DirEntry);
+  //entrys_per_cluster shouldn't ever be 0, our FS would be broken. Crashing is a good thing to do in that case.
+  u_int32_t current_cluster_free = current_dir_position % entrys_per_cluster;
+  
+  //Add another cluster
+  if(current_cluster_free < length){
+      fat_find_free();
+      u_int32_t used_clusters = (ceil_div(currrent_dir_positionm,entrys_per_cluster);
+      dirtables = realloc(dirtables, cluster_size * (used_clusters+1));
+      add_address_region(address_from_fatcluc(current_fat_position),cluster_size,dirtables + (used_clusters*cluster_size),0);
+  }
+  //copy the data in
+  memcpy(dirtables + current_dir_position,entry,length);
+  current_dir_position += length;
+  //Profit!   
+}
+
+static void add_files(char *name,u_int32_t start_cluster,u_int32_t size)
+{
+  DirEntry entry;
+  memcpy(entry.DIR_Ext,name + strlen(name)-3,3);
+}
+
+static void scan_folder(char *path)
+{
+  DIR * d = opendir(path);
+  struct stat st;
+  if(d==NULL) return; 
+  struct dirent * dir;
+  while ((dir = readdir(d)) != NULL)
+    {
+      if(dir-> d_type != DT_DIR){
+        char f_path[PATH_MAX];
+        sprintf(f_path, "%s/%s",path,dir->d_name);
+        stat(f_path,&st);
+        printf("%s/%s  %lu\n",path, dir->d_name,st.st_size);        
+      }
+      else{
+        if(dir -> d_type == DT_DIR && strcmp(dir->d_name,".")!=0 && strcmp(dir->d_name,"..")!=0 ) // skip . and ..
+        {
+          char d_path[PATH_MAX]; 
+          sprintf(d_path, "%s/%s", path, dir->d_name);
+          scan_folder(d_path); // recursive
+        }
+      }
+    }
+    closedir(d);
+}
+
+int main (int argc, char *argv[])
+{
+  if (argc < 3)
     {
       fprintf (stderr,
 	       "Usage:\n"
-	       "  %s /dev/nbd0\n"
+	       "  %s /dev/nbd0 ./folder_to_export\n"
 	       "Don't forget to load nbd kernel module (`modprobe nbd`) and\n"
 	       "run example from root.\n", argv[0]);
       return 1;
@@ -400,17 +510,14 @@ main (int argc, char *argv[])
 //  fprintf(stderr,"Creating virtual disk of size %llu\n",aop.size);
 
 //  data = malloc(aop.size);
+  scan_folder(argv[2]);
 
+  return 0;
   build_mbr ();
   build_boot_sector ();
   build_fats ();
   build_files ();
   
-  fprintf(stderr,"root dir loc: %u\n",root_dir_loc());
-  fprintf(stderr,"cluster for 1871872: %u\n",clus_from_addr(1871872));
-  fprintf(stderr,"fat entry for 1871872: %u\n",fat_entry_from_addr(1871872));
-  fprintf(stderr,"address for cluster 2: %llu\n",address_from_fatclus(2));
-      
 /*
   u_int32_t size=atoi(argv[2]); // 100;
   u_int32_t location = part1_base + atoi(argv[3]);// 3072;
@@ -432,6 +539,36 @@ main (int argc, char *argv[])
   return buse_main (argv[1], &aop, (void *) &xmpl_debug);
 }
 
+//testRead(atoi(argv[2]),atoi(argv[3]));
+static void testRead(u_int32_t size, u_int32_t location)
+{
+
+//  u_int32_t size=atoi(argv[2]); // 100;
+//  u_int32_t location = part1_base + atoi(argv[3]);// 3072;
+  unsigned char *buf = malloc(size);
+  xmp_read (buf, size, location, &xmpl_debug);
+
+  u_int32_t pos=0;
+  while(size>0){
+    if(pos%8==0){
+      fprintf(stderr,"\n%02x ",location);
+      }
+    fprintf(stderr,"%02x ",buf[pos++]);
+    size--;
+    location++;
+  }
+  fprintf(stderr,"\n");
+
+
+}
+
+static void testUtilities()
+{
+  fprintf(stderr,"root dir loc: %u\n",root_dir_loc());
+  fprintf(stderr,"cluster for 1871872: %u\n",clus_from_addr(1871872));
+  fprintf(stderr,"fat entry for 1871872: %u\n",fat_entry_from_addr(1871872));
+  fprintf(stderr,"address for cluster 2: %llu\n",address_from_fatclus(2));
+}
 
 static void printBootSect (BootEntry bootentry)
 {

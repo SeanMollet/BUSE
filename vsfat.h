@@ -62,6 +62,18 @@ typedef struct DirEntry {
 	u_int16_t DIR_FstClusLO;
 	u_int32_t DIR_FileSize;
 }DirEntry;
+
+typedef struct LDirEntry{
+        u_int8_t LDIR_Ord;
+        unsigned char LDIR_Name1[10];//Char 1-5
+        u_int8_t LDIR_Attr;
+        u_int8_t LDIR_Type;
+        u_int8_t LDIR_Chksum;
+        unsigned char LDIR_Name2[12];//Char 6-11
+        u_int16_t LDIR_FstClusLO;
+        unsigned char LDIR_Name3[4];//Char 12-13
+}LDirEntry;
+
 #pragma pack(pop) 
 
 #endif /* VSFAT_H_INCLUDED */
