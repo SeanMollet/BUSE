@@ -182,21 +182,21 @@ static int xmp_write (const void *buf, u_int32_t len, u_int64_t offset, void *us
 
 static void xmp_disc (void *userdata)
 {
-  (void) (userdata);
-  fprintf (stderr, "Received a disconnect request.\n");
+  if (*(int *) userdata)
+    fprintf (stderr, "Received a disconnect request.\n");
 }
 
 static int xmp_flush (void *userdata)
 {
-  (void) (userdata);
-  fprintf (stderr, "Received a flush request.\n");
+  if (*(int *) userdata)
+    fprintf (stderr, "Received a flush request.\n");
   return 0;
 }
 
 static int xmp_trim (u_int64_t from, u_int32_t len, void *userdata)
 {
-  (void) (userdata);
-  fprintf (stderr, "T - %llu, %u\n", from, len);
+  if (*(int *) userdata)
+    fprintf (stderr, "T - %llu, %u\n", from, len);
   return 0;
 }
 
