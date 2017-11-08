@@ -32,7 +32,7 @@ static const u_int32_t part1_base = 1048576;
 static BootEntry bootentry;
 
 static u_int32_t *fat=0;
-static u_int32_t current_fat_position=2;
+static u_int32_t current_fat_position=3; // 0 and 1 are special and 2 is the root dir
 static unsigned char fat_end[] = { 0xFF, 0xFF, 0xFF, 0x0F};
 
 static unsigned char *dirtables=0;
@@ -350,7 +350,8 @@ static u_int32_t data_loc ()
 static void build_fats ()
 {
   //These first two entries are part of the spec
-  unsigned char fatspecial[] = { 0xF8, 0xFF, 0xFF, 0x0F, 0xFF, 0xFF, 0xFF, 0x0F};
+  //The third marks our root directly
+  unsigned char fatspecial[] = { 0xF8, 0xFF, 0xFF, 0x0F, 0xFF, 0xFF, 0xFF, 0x0F,0xF8, 0xFF, 0xFF, 0x0F};
   // 0xF8, 0xFF, 0xFF, 0x0F,0xFF, 0xFF, 0xFF, 0x0F, 0xFF, 0xFF, 0xFF, 0x0F, 0xFF, 0xFF, 0xFF, 0x0F};
 
 //  unsigned char fatfileend[] = { 0xF8, 0xFF, 0xFF, 0x0F};
@@ -432,8 +433,14 @@ static int fat_new_file(unsigned char* data,char *filepath,u_int32_t length)
     while(length>0){
       fat[current_fat_position] = current_fat_position+1;
       current_fat_position++;
-      length -= cluster_size;
+      //Unsigned, so the subtraction could loop us around
+      if(length > cluster_size){
+        length -= cluster_size;
       }
+      else{
+        length=0;
+      } 
+    }
     memcpy(&fat[current_fat_position-1],fat_end,sizeof(fat_end)); // Terminate this chain      
   return 0;
 }
@@ -442,14 +449,19 @@ static int fat_new_file(unsigned char* data,char *filepath,u_int32_t length)
 static void dir_add_entry(unsigned char *entry,u_int32_t length)
 {
   u_int32_t cluster_size = (bootentry.BPB_BytsPerSec * bootentry.BPB_SecPerClus);
+  u_int32_t entrys_per_cluster = cluster_size/sizeof(DirEntry);
+  u_int32_t current_cluster_free = current_dir_position % entrys_per_cluster;
+  
+  //We don't let re-alloc do this, because we need to grab cluster 2 for the first one
+  //We also override the current_cluster_free because the 0 breaks it
   //Make sure the DIR exists
   if(dirtables == 0){
     dirtables = malloc(cluster_size);
     add_address_region(address_from_fatsec(root_dir_loc()),cluster_size,dirtables,0);
+    current_cluster_free=entrys_per_cluster;
     }
-  u_int32_t entrys_per_cluster = cluster_size/sizeof(DirEntry);
+    
   //entrys_per_cluster shouldn't ever be 0, our FS would be broken. Crashing is a good thing to do in that case.
-  u_int32_t current_cluster_free = current_dir_position % entrys_per_cluster;
   
   //Add another cluster
   if(current_cluster_free < length){
@@ -459,7 +471,7 @@ static void dir_add_entry(unsigned char *entry,u_int32_t length)
       add_address_region(address_from_fatclus(current_fat_position),cluster_size,dirtables + (used_clusters*cluster_size),0);
   }
   //copy the data in
-  memcpy(dirtables + current_dir_position,entry,length);
+  memcpy(dirtables + current_dir_position*sizeof(DirEntry),entry,length*sizeof(DirEntry));
   current_dir_position += length;
   //Profit!   
 }
@@ -476,6 +488,9 @@ static void remove_spaces(unsigned char *input,u_int32_t length)
 static void add_file(char *name,char* filepath,u_int32_t size)
 {
   DirEntry entry;
+  //Make sure it's clear
+  memset(&entry,0,sizeof(DirEntry));
+  
   //For now, just stupid 8.3
   memcpy(entry.DIR_Ext,name + strlen(name)-3,3);
   memcpy(entry.DIR_Name,name,8);
@@ -543,31 +558,9 @@ int main (int argc, char *argv[])
 //  data = malloc(aop.size);
   build_mbr();
   build_boot_sector();
-  build_fats;
+  build_fats();
   scan_folder(argv[2]);
 
-  return 0;
-
-//  build_files ();
-  
-/*
-  u_int32_t size=atoi(argv[2]); // 100;
-  u_int32_t location = part1_base + atoi(argv[3]);// 3072;
-  unsigned char *buf = malloc(size);
-  xmp_read (buf, size, location, &xmpl_debug);
-  
-  u_int32_t pos=0;
-  while(size>0){
-    if(pos%8==0){
-      fprintf(stderr,"\n%02x ",location);
-      }
-    fprintf(stderr,"%02x ",buf[pos++]);
-    size--;
-    location++;
-  }  
-  fprintf(stderr,"\n");
-  
-*/
   return buse_main (argv[1], &aop, (void *) &xmpl_debug);
 }
 
