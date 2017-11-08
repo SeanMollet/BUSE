@@ -457,7 +457,7 @@ static int fat_new_file(unsigned char* data,char *filepath,u_int32_t length)
 }
 
 //This does accept multiple entries. However, it does not accept more than a single file worth
-static void dir_add_entry(unsigned char *entry,u_int32_t length)
+static int dir_add_entry(unsigned char *entry,u_int32_t length)
 {
   u_int32_t cluster_size = (bootentry.BPB_BytsPerSec * bootentry.BPB_SecPerClus);
   u_int32_t entrys_per_cluster = cluster_size/sizeof(DirEntry);
@@ -474,6 +474,12 @@ static void dir_add_entry(unsigned char *entry,u_int32_t length)
     
   //entrys_per_cluster shouldn't ever be 0, our FS would be broken. Crashing is a good thing to do in that case.
   
+  //Make sure we don't exceed the 2Mb limit for directory size
+  if(current_dir_position+length > (1024*1024*2)/sizeof(DirEntry))
+  {
+    return -1;
+  }
+  
   //Add another cluster
   if(current_cluster_free < length){
       fat_find_free();
@@ -484,7 +490,8 @@ static void dir_add_entry(unsigned char *entry,u_int32_t length)
   //copy the data in
   memcpy(dirtables + current_dir_position*sizeof(DirEntry),entry,length*sizeof(DirEntry));
   current_dir_position += length;
-  //Profit!   
+  //Profit!  
+  return 0; 
 }
 
 static void format_name(unsigned char *input,u_int32_t length)
@@ -524,8 +531,10 @@ static void add_file(char *name,char* filepath,u_int32_t size)
   //dir_add_entry wants a byte array so it can have multiple entries chained together
   //We just cast the struct pointer and tell it how many there are (1 for short filename)
   
-  dir_add_entry((unsigned char*) &entry,1);
-  fat_new_file(0,filepath,size);
+  if(dir_add_entry((unsigned char*) &entry,1) == 0)
+  {
+    fat_new_file(0,filepath,size);
+  }
 }
 
 static void scan_folder(char *path)
