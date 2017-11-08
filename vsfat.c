@@ -91,9 +91,6 @@ xmp_read (void *buf, u_int32_t len, u_int64_t offset, void *userdata)
 	   offset + len >= address_regions[a].base + address_regions[a].length)
 	   )
 	{
-	  //For real memory mapped stuff
-	  if (address_regions[a].mem_pointer)
-	    {
 	      //Make sure the buffer is zeroed
 	      //memset (buf, 0, len);
 	      u_int32_t uselen = len;
@@ -134,18 +131,32 @@ xmp_read (void *buf, u_int32_t len, u_int64_t offset, void *userdata)
 			   address_regions[a].base, address_regions[a].length,
 			   usepos, offset, len, usetarget, uselen);
 //		}
-	      memcpy ((unsigned char *) buf + usetarget,
+              //For real memory mapped stuff
+              if (address_regions[a].mem_pointer)
+              {
+	        memcpy ((unsigned char *) buf + usetarget,
 		      (unsigned char *) address_regions[a].mem_pointer +
 		      usepos, uselen);
-	      len = len - (uselen + usetarget);
-	      offset += uselen + usetarget;
-	      buf = (unsigned char*)buf + uselen + usetarget;
-	    }
-	  //A mapped in file
-	  if (address_regions[a].file_path)
-	    {
-	      //TODO: Implement me
-	    }
+                len = len - (uselen + usetarget);
+                offset += uselen + usetarget;
+                buf = (unsigned char*)buf + uselen + usetarget;
+              }
+              else //Mapped in file
+              {
+                if(address_regions[a].file_path)
+                {
+                  FILE *fd = fopen(address_regions[a].file_path,"rb");
+                  if(fd)
+                  {
+                    fseek(fd,usepos,SEEK_SET);
+                    fread((unsigned char *) buf + usetarget,uselen,1,fd);
+                    fclose(fd);
+                    len = len - (uselen + usetarget);
+                    offset += uselen + usetarget;
+                    buf = (unsigned char*)buf + uselen + usetarget;
+                  }
+                }
+              }
 	}
       }
       //If we've gotten here, we've used up all the mapped in areas, so fill the rest with 0s
