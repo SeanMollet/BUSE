@@ -364,20 +364,13 @@ static void build_fats ()
   //These first two entries are part of the spec
   //The third marks our root directly
   unsigned char fatspecial[] = { 0xF8, 0xFF, 0xFF, 0x0F, 0xFF, 0xFF, 0xFF, 0x0F,0xF8, 0xFF, 0xFF, 0x0F};
-  // 0xF8, 0xFF, 0xFF, 0x0F,0xFF, 0xFF, 0xFF, 0x0F, 0xFF, 0xFF, 0xFF, 0x0F, 0xFF, 0xFF, 0xFF, 0x0F};
-
-//  unsigned char fatfileend[] = { 0xF8, 0xFF, 0xFF, 0x0F};
-  /*, 0xF8, 0xFF, 0xFF, 0x0F,	//Special entries
-    0xFF, 0xFF, 0xFF, 0x0F, 0xFF, 0xFF, 0xFF, 0x0F, 0xFF, 0xFF, 0xFF, 0x0F
-  };				//My 3 files*/
-  
 
   fat = malloc (bootentry.BPB_FATSz32 * bootentry.BPB_BytsPerSec);
   memset (fat, 0, bootentry.BPB_FATSz32 * bootentry.BPB_BytsPerSec);
   
   memcpy(fat,fatspecial,sizeof(fatspecial));
     
-  //For now, just map these in blind
+  //There are two copies of the fat, we map the same memory into both
   printf ("fat0: %llx\n", address_from_fatsec (fat_location (0)));
   printf ("fat1: %llx\n", address_from_fatsec (fat_location (1)));
 
