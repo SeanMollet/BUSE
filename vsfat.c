@@ -493,9 +493,10 @@ static void format_name(unsigned char *input,u_int32_t length)
     if(input[a] == 0x20){ // Space
       input[a] = 0x5F; // _
     }
-    else{
-    input[a] = toupper(input[a]);
+    if(input[a] == 0xe5){
+      input[a] = 0x05;
     }
+    input[a] = toupper(input[a]); //This does nothing if there isn't an upper case form
   }
 }
 
