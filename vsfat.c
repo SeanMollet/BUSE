@@ -89,46 +89,47 @@ static int xmp_read (void *buf, u_int32_t len, u_int64_t offset, void *userdata)
 	   offset + len >= address_regions[a].base + address_regions[a].length)
 	   )
 	{
-	      //Make sure the buffer is zeroed
-	      //memset (buf, 0, len);
 	      u_int32_t uselen = len;
 	      u_int32_t usepos;
 	      u_int32_t usetarget;
+	      
+	      //Figure out who's first and set the offset variables accordingly
 	      if (offset < address_regions[a].base)
-		{
-		  usepos = 0;
-		  usetarget = address_regions[a].base - offset;
-		}
+              {
+                usepos = 0;
+                usetarget = address_regions[a].base - offset;
+              }
 	      else
-		{
-		  usepos = offset - address_regions[a].base;
-		  usetarget = 0;
-		}
+              {
+                usepos = offset - address_regions[a].base;
+	        usetarget = 0;
+              }
 
 	      //If they're only asking for part of what we have
 	      if (address_regions[a].base + address_regions[a].length >= offset + len)
-		{
-		  uselen = offset + len - address_regions[a].base;
-		}
+	      {
+	        uselen = offset + len - address_regions[a].base;
+	      }
 
 	      //Make sure we don't go off the end
 	      if (uselen > address_regions[a].length-usepos)
-		{
-		  uselen = address_regions[a].length-usepos;
-		}
+	      {
+	        uselen = address_regions[a].length-usepos;
+	      }
               //Or give them more than what they want
               if(uselen > len)
                 {
                   uselen = len;
                 }
 
-//	      if (*(int *) userdata)
-//		{
+	      if (*(int *) userdata)
+		{
 		  fprintf (stderr,
 			   "base: %#llx length: %#llx usepos: %#x offset: %#llx len: %#x usetarget: %#x uselen: %#x\n",
 			   address_regions[a].base, address_regions[a].length,
 			   usepos, offset, len, usetarget, uselen);
-//		}
+		}
+
               //For real memory mapped stuff
               if (address_regions[a].mem_pointer)
               {
