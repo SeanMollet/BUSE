@@ -22,6 +22,7 @@
 #include <string.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <ctype.h>
 
 #include "buse.h"
 #include "vsfat.h"
@@ -546,13 +547,20 @@ static void scan_folder(char *path)
   while ((dir = readdir(d)) != NULL)
     {
       if(dir-> d_type != DT_DIR){
-        char *f_path;
-        f_path = malloc(PATH_MAX);
+        if(strlen(dir->d_name)+strlen(path)+1<PATH_MAX)// If our full path exceeds the allowable length, drop this file
+        {
+          char *f_path;
+          f_path = malloc(strlen(dir->d_name)+strlen(path)+2);
         
-        sprintf(f_path, "%s/%s",path,dir->d_name);
-        stat(f_path,&st);
-        printf("%s/%s  %lu\n",path, dir->d_name,st.st_size);        
-        add_file(dir->d_name,f_path,st.st_size);
+          sprintf(f_path, "%s/%s",path,dir->d_name);
+          stat(f_path,&st);
+          printf("%s/%s  %lu\n",path, dir->d_name,st.st_size);        
+          add_file(dir->d_name,f_path,st.st_size);
+        }
+        else
+        {
+          fprintf(stderr,"File %s/%s path is too long\n",path,dir->d_name);
+        }
       }
       else{
         if(dir -> d_type == DT_DIR && strcmp(dir->d_name,".")!=0 && strcmp(dir->d_name,"..")!=0 ) // skip . and ..
