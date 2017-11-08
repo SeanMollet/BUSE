@@ -70,11 +70,8 @@ static struct buse_operations aop = {
   .size_blocks = 4292870144,
 };
 
-//static u_int64_t part_blocks = aop.size_blocks-2048;
-
-
-static int
-xmp_read (void *buf, u_int32_t len, u_int64_t offset, void *userdata)
+//API Functions
+static int xmp_read (void *buf, u_int32_t len, u_int64_t offset, void *userdata)
 {
   if (*(int *) userdata)
     fprintf (stderr, "Read %#x bytes from  %#llx\n", len, offset);
@@ -168,8 +165,7 @@ xmp_read (void *buf, u_int32_t len, u_int64_t offset, void *userdata)
   return 0;
 }
 
-static int
-xmp_write (const void *buf, u_int32_t len, u_int64_t offset, void *userdata)
+static int xmp_write (const void *buf, u_int32_t len, u_int64_t offset, void *userdata)
 {
   (void)buf;
   if (*(int *) userdata)
@@ -183,8 +179,7 @@ xmp_write (const void *buf, u_int32_t len, u_int64_t offset, void *userdata)
   return 0;
 }
 
-static void
-xmp_disc (void *userdata)
+static void xmp_disc (void *userdata)
 {
   (void) (userdata);
   fprintf (stderr, "Received a disconnect request.\n");
@@ -204,6 +199,9 @@ static int xmp_trim (u_int64_t from, u_int32_t len, void *userdata)
   return 0;
 }
 
+
+
+//Add an address region to the mapped address regions array
 static void add_address_region (u_int64_t base, u_int64_t length, void *mem_pointer,
 		    char *file_path)
 {
@@ -216,6 +214,7 @@ static void add_address_region (u_int64_t base, u_int64_t length, void *mem_poin
   address_regions[address_regions_count - 1].file_path = file_path;
 }
 
+//Build and map the MBR. Note that we just use a generic 2TB size
 static void build_mbr ()
 {
   unsigned char bootcode[] =
@@ -252,6 +251,7 @@ static void build_mbr ()
 
 }
 
+//Build and map the bootsector(s)
 static void build_boot_sector ()
 {
 
@@ -306,22 +306,27 @@ static void build_boot_sector ()
 		      &bootentry, 0);
 }
 
+//Return a memory address given a fat sector
 static u_int64_t address_from_fatsec (u_int32_t fatsec)
 {
   return (u_int64_t) part1_base +
     (u_int64_t) bootentry.BPB_BytsPerSec * fatsec;
 }
+
+//Return a memory address given a fat cluster
 static u_int64_t address_from_fatclus (u_int32_t fatclus)
 {
   return (u_int64_t) address_from_fatsec(fat_location(bootentry.BPB_NumFATs)) +
     (u_int64_t) bootentry.BPB_BytsPerSec * bootentry.BPB_SecPerClus * (fatclus-2);
 }
 
+//Find either of the FATS
 static u_int32_t fat_location (u_int32_t fatnum)
 {
   return bootentry.BPB_RsvdSecCnt + bootentry.BPB_FATSz32 * fatnum;
 }
 
+//Reverse lookup a cluster given an address
 static u_int32_t clus_from_addr(u_int64_t address)
 {
   u_int64_t fatbase = address_from_fatsec(root_dir_loc());
@@ -333,6 +338,7 @@ static u_int32_t clus_from_addr(u_int64_t address)
   return address/(bootentry.BPB_BytsPerSec * bootentry.BPB_SecPerClus)+2;
 }
 
+//Reverse lookup a fat from an address
 static u_int32_t fat_entry_from_addr(u_int64_t address)
 {
   //We just use the first fat since we shouldn't be updating anyway
@@ -341,7 +347,7 @@ static u_int32_t fat_entry_from_addr(u_int64_t address)
   return address_from_fatsec(fat_location(0)) + cluster*4;
 }  
 
-//Probably useless
+//Returns the location of the root_dir
 static u_int32_t root_dir_loc ()
 {
   //BPB_NumFATs is 1 based, so this actually gives us the end of the last fat
@@ -358,7 +364,7 @@ static u_int32_t data_loc ()
   return root_dir_loc () + 1;
 }
 
-
+//Do the initial FAT setup and mapping
 static void build_fats ()
 {
   //These first two entries are part of the spec
@@ -382,7 +388,7 @@ static void build_fats ()
 		      0);
 }
 
-
+//Test function used to stuff in a hard coded dir and files
 static void build_files ()
 {
 
@@ -403,6 +409,7 @@ unsigned char file3[] = {0x32,0x31,0x3A,0x0A,0x44,0x69,0x6D,0x73,0x75,0x6D,0x0A,
   //add_address_region (part1_base + 823296, sizeof (filedata), files, 0);
 }
 
+//Advance the pointer to the next free sector in the fat
 static void fat_find_free()
 {
   while(fat[current_fat_position] != 0){
@@ -414,6 +421,7 @@ static void fat_find_free()
   }  
 }
 
+//Utility function for division that always returns a rounded up value
 static u_int32_t ceil_div(u_int32_t x,u_int32_t y)
 {
   return  (x % y) ? x / y + 1 : x / y; //Ceiling division
@@ -466,15 +474,13 @@ static int dir_add_entry(unsigned char *entry,u_int32_t length)
     current_cluster_free=entrys_per_cluster;
     }
     
-  //entrys_per_cluster shouldn't ever be 0, our FS would be broken. Crashing is a good thing to do in that case.
-  
   //Make sure we don't exceed the 2Mb limit for directory size
   if(current_dir_position+length > (1024*1024*2)/sizeof(DirEntry))
   {
     return -1;
   }
   
-  //Add another cluster
+  //Add another cluster if needed
   if(current_cluster_free < length){
       fat_find_free();
       u_int32_t used_clusters = ceil_div(current_dir_position,entrys_per_cluster);
@@ -579,9 +585,6 @@ int main (int argc, char *argv[])
       return 1;
     }
 
-//  fprintf(stderr,"Creating virtual disk of size %llu\n",aop.size);
-
-//  data = malloc(aop.size);
   build_mbr();
   build_boot_sector();
   build_fats();
