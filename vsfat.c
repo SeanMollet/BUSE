@@ -487,11 +487,14 @@ static void dir_add_entry(unsigned char *entry,u_int32_t length)
   //Profit!   
 }
 
-static void remove_spaces(unsigned char *input,u_int32_t length)
+static void format_name(unsigned char *input,u_int32_t length)
 {
   for(u_int32_t a=0;a<length;a++){
     if(input[a] == 0x20){ // Space
       input[a] = 0x5F; // _
+    }
+    else{
+    input[a] = toupper(input[a]);
     }
   }
 }
@@ -506,11 +509,12 @@ static void add_file(char *name,char* filepath,u_int32_t size)
   memcpy(entry.DIR_Ext,name + strlen(name)-3,3);
   memcpy(entry.DIR_Name,name,8);
 
-  remove_spaces(entry.DIR_Ext,3);
-  remove_spaces(entry.DIR_Name,8);
+  format_name(entry.DIR_Ext,3);
+  format_name(entry.DIR_Name,8);
 
   entry.DIR_Attr = 0x20; //Set the "Archive" bit
-
+  //entry.DIR_NRRes = 0x08 | 0x10; //Everything is lowercase
+  
   fat_find_free();
   entry.DIR_FstClusLO = (u_int16_t) (current_fat_position & 0x00FF);
   entry.DIR_FstClusHI = (u_int16_t) (current_fat_position & 0xFF00)>>16;
