@@ -495,9 +495,26 @@ static int dir_add_entry(unsigned char *entry,u_int32_t length)
   return 0; 
 }
 
-static void format_name(unsigned char *input,u_int32_t length)
+//Long filename checksum of SFN
+static unsigned char fn_checksum (unsigned char *filename)
 {
-  for(u_int32_t a=0;a<length;a++){
+  u_int8_t filename_len;
+  unsigned char sum;
+
+  sum = 0;                                                                                                                                                                                           
+  for (filename_len = 11; filename_len != 0; filename_len--)
+    {   
+      // NOTE: The operation is an unsigned char rotate right                 
+      sum = ((sum & 1) ? 0x80 : 0) + (sum >> 1) + *filename++;
+    }   
+  return (sum);
+}
+
+static void format_name_83(char *input,u_int32_t length,unsigned char *filename,unsigned char *ext)
+{
+  int32_t period=-1;
+  //First we take out things we know don't belong
+  for(int a=0;a<(int32_t)length;a++){
     if(input[a] == 0x20){ // Space
       input[a] = 0x5F; // _
     }
@@ -505,7 +522,39 @@ static void format_name(unsigned char *input,u_int32_t length)
       input[a] = 0x05;
     }
     input[a] = toupper(input[a]); //This does nothing if there isn't an upper case form
+    //Check if this is a period
+    if(input[a] == 46)
+    {
+      period=a;
+    }
   }
+  
+  //If we got a period, fill out the filename and ext fields
+  if(period>0)
+  {
+    for(int a=0; a<3;a++)
+    {
+      //Note: the +1 is needed because period= the actual period, not the extension
+      if(period+a+1 <  (int32_t)length)
+      {
+        ext[a] = input[period+a+1];
+      }
+      else
+      {
+        ext[a] = 0x20;
+      }
+    }
+    for(int a=0; a<8;a++)
+    {
+      if(a < period)
+      {
+        filename[a] = input[a];
+      }
+      else{
+        filename[a] = 0x20;
+      }
+    }
+  }  
 }
 
 static void add_file(char *name,char* filepath,u_int32_t size)
@@ -515,12 +564,13 @@ static void add_file(char *name,char* filepath,u_int32_t size)
   memset(&entry,0,sizeof(DirEntry));
   
   //For now, just stupid 8.3
-  memcpy(entry.DIR_Ext,name + strlen(name)-3,3);
+  format_name_83(name,strlen(name),entry.DIR_Name,entry.DIR_Ext);
+/*  memcpy(entry.DIR_Ext,name + strlen(name)-3,3);
   memcpy(entry.DIR_Name,name,8);
 
   format_name(entry.DIR_Ext,3);
   format_name(entry.DIR_Name,8);
-
+*/
   entry.DIR_Attr = 0x20; //Set the "Archive" bit
   //entry.DIR_NRRes = 0x08 | 0x10; //Everything is lowercase
   
