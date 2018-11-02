@@ -4,7 +4,7 @@ OBJS		:= $(TARGET:=.o) $(LIBOBJS)
 STATIC_LIB	:= libbuse.a
 
 CC		:= /usr/bin/gcc
-CFLAGS		:= -g -pedantic -Wall -Wextra -std=gnu99
+CFLAGS		:= -g -pedantic -Wall -Wextra -std=gnu99 -Og
 LDFLAGS		:= -L. -lbuse
 
 .PHONY: all clean

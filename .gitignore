@@ -3,3 +3,5 @@
 *.a
 busexmp
 loopback
+vsfat
+._.DS_Store
