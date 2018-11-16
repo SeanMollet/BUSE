@@ -24,9 +24,26 @@ given path. When complete, it will say:
 Once this is done, /dev/nbd0 will appear as a 2TB HDD, with a single 2TB 
 partition formatted FAT32 containing all the files inside /path/to/export
 
-## USB Host mode
+## USB Device Mode
 
-Todo: Add instructions for using USB host mode
+Thanks to By Andrew Mulholland (gbaman) and his Gist at 
+https://gist.github.com/gbaman/50b6cca61dd1c3f88f41 for clean, consise instructions 
+on setting this up. Pertinent sections reproduced here.  
+
+###2. Modular, but slower to setup method
+ 
+    
+1. First, flash Jessie (only tested on full, lite version may also work though) onto a blank microSD card.  
+2. **(step only needed if running Raspbain version before 2016-05-10)** Once it starts up again, run ```sudo BRANCH=next rpi-update```. This will take a while.  
+3. Next we need to make sure we are using the dwc2 USB driver ```echo "dtoverlay=dwc2" | sudo tee -a /boot/config.txt```.
+4. And enable it in Raspbian ```echo "dwc2" | sudo tee -a /etc/modules```
+5. Need to now pick which module you want to use from the list above, for example for ethernet ```echo "g_ether" | sudo tee -a /etc/modules```. You can only pick one of the above modules to use at a time.   
+    
+### Using the modules
+
+- **g_mass_storage** - To have your Pi Zero appear as a mass storage device (flash drive), connected to the nbd0 device for example ```sudo modprobe g_mass_storage  file=/dev/nbd0 stall=0```.
+
+In theory, most USB devices should work alongside these kernels, to switch to USB OTG mode, simply don't use an OTG adapter cable and use a standard USB cable to plug your Pi Zero into another computer, it should auto switch.   
 
 ## Based on BUSE - A block device in userspace
 
