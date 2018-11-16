@@ -25,6 +25,19 @@
 
 #include "utils.h"
 
+//Compare two arrays up to "length" bytes for equality
+int8_t arrays_equal(uint8_t *left, uint8_t *right, int8_t length)
+{
+        for (; length > 0; length--)
+        {
+                if (left[length] != right[length])
+                {
+                        return 0;
+                }
+        }
+        return 1;
+}
+
 //Utility function for division that always returns a rounded up value
 uint32_t ceil_div(uint32_t x, uint32_t y)
 {
