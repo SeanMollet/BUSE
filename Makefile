@@ -17,7 +17,7 @@ $(TARGET:=.o): %.o: %.c buse.h
 	$(CC) $(CFLAGS) -o $@ -c $<
 
 $(STATIC_LIB): $(LIBOBJS)
-	ar rcu $(STATIC_LIB) $(LIBOBJS)
+	ar rc $(STATIC_LIB) $(LIBOBJS)
 
 $(LIBOBJS): %.o: %.c
 	$(CC) $(CFLAGS) -o $@ -c $<
