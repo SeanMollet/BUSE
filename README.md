@@ -11,10 +11,10 @@ as per the FAT32 specification.
 ## Running
 
 vsFat is ready to go out of the box. Download, compile with make and execute 
-the following as root:
+the following :
 
-    modprobe nbd
-    ./vsfat /dev/nbd0 /path/to/export
+    sudo modprobe nbd
+    sudo ./vsfat /dev/nbd0 /path/to/export &
     
 It will process for a few seconds while it catalogs all of the files under the
 given path. When complete, it will say:
