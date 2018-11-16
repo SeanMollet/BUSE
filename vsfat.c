@@ -469,8 +469,18 @@ static void up_dir()
   //Commented out for debugging - will need to be removed for tracking if writing is desired
   if (current_dir != &root_dir)
   {
+    //I purposely don't free dirtables, because it's mapped
     free(current_dir->path);
     free(current_dir);
+
+    //Clear the filename entries as well
+    FileEntry *freeFile = current_dir->files;
+    while (freeFile != 0)
+    {
+      FileEntry *next = freeFile->next;
+      free(freeFile);
+      freeFile = next;
+    }
   }
 
   //If the parent is root, we just stay at the root
