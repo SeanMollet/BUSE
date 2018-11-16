@@ -151,5 +151,5 @@ typedef struct FSInfo
 
 //Global variables
 extern BootEntry bootentry;
-
+extern uint32_t *fat;
 #endif /* VSFAT_H_INCLUDED */

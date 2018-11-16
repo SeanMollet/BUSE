@@ -34,8 +34,8 @@
 static unsigned char *mbr;
 
 BootEntry bootentry;
+uint32_t *fat = 0;
 
-static uint32_t *fat = 0;
 static uint32_t current_fat_position; // 0 and 1 are special and 2 is the root dir
 static unsigned char fat_end[] = {0xFF, 0xFF, 0xFF, 0xFF};
 
@@ -228,33 +228,6 @@ static int xmp_trim(uint64_t from, uint32_t len, void *userdata)
 #endif
   }
   return 0;
-}
-
-//Do the initial FAT setup and mapping
-static void build_fats()
-{
-  //These first two entries are part of the spec
-  unsigned char fatspecial[] = {0xF8, 0xFF, 0xFF, 0x0F, 0xFF, 0xFF, 0xFF, 0x0F};
-
-  fat = malloc(bootentry.BPB_FATSz32 * bootentry.BPB_BytsPerSec);
-  memset(fat, 0, bootentry.BPB_FATSz32 * bootentry.BPB_BytsPerSec);
-
-  memcpy(fat, fatspecial, sizeof(fatspecial));
-
-//There are two copies of the fat, we map the same memory into both
-#if defined(ENV64BIT)
-  printf("fat0: %lx\n", address_from_fatsec(fat_location(0)));
-  printf("fat1: %lx\n", address_from_fatsec(fat_location(1)));
-#else
-  printf("fat0: %llx\n", address_from_fatsec(fat_location(0)));
-  printf("fat1: %llx\n", address_from_fatsec(fat_location(1)));
-#endif
-  add_address_region(address_from_fatsec(fat_location(0)),
-                     bootentry.BPB_FATSz32 * bootentry.BPB_BytsPerSec, fat,
-                     0);
-  add_address_region(address_from_fatsec(fat_location(1)),
-                     bootentry.BPB_FATSz32 * bootentry.BPB_BytsPerSec, fat,
-                     0);
 }
 
 //Create the root directory entry and set it as the current directory
