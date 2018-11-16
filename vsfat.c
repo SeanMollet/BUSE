@@ -339,15 +339,28 @@ static int fat_new_file(uint32_t file_fat_position, unsigned char *data, char *f
 }
 
 //Check if the current directory entry has space available
-static int dir_entry_free()
+static int dir_entry_sectors_needed(uint32_t entries_needed)
 {
+  if (entries_needed == 0)
+  {
+    entries_needed = 1;
+  }
+
+  uint32_t cluster_size = (bootentry.BPB_BytsPerSec * bootentry.BPB_SecPerClus);
+  uint32_t entrys_per_cluster = cluster_size / sizeof(DirEntry);
+
   if (current_dir->dirtables == 0)
+  {
+    return ceil_div(entries_needed, entrys_per_cluster);
+  }
+  uint32_t free_entries = entrys_per_cluster - (current_dir->current_dir_position % entrys_per_cluster);
+  if (free_entries > entries_needed)
   {
     return 0;
   }
-  uint32_t cluster_size = (bootentry.BPB_BytsPerSec * bootentry.BPB_SecPerClus);
-  uint32_t entrys_per_cluster = cluster_size / sizeof(DirEntry);
-  return current_dir->current_dir_position % entrys_per_cluster;
+  //Subtract the last of what we already have
+  entries_needed -= free_entries;
+  return ceil_div(entries_needed, entrys_per_cluster);
 }
 
 //This does accept multiple entries. However, it does not accept more than a single file worth
@@ -432,16 +445,22 @@ static int dir_add_entry(unsigned char *entry, uint32_t length)
 }
 
 //Long filename checksum of SFN
-static unsigned char fn_checksum(unsigned char *filename)
+//Thanks to itisravi, https://gist.github.com/itisravi/4440535 for this algorithm
+static unsigned char fn_checksum(unsigned char *filename, unsigned char *ext)
 {
   uint8_t filename_len;
   unsigned char sum;
 
   sum = 0;
-  for (filename_len = 11; filename_len != 0; filename_len--)
+  for (filename_len = 8; filename_len != 0; filename_len--)
   {
     // NOTE: The operation is an unsigned char rotate right
     sum = ((sum & 1) ? 0x80 : 0) + (sum >> 1) + *filename++;
+  }
+  for (filename_len = 3; filename_len != 0; filename_len--)
+  {
+    // NOTE: The operation is an unsigned char rotate right
+    sum = ((sum & 1) ? 0x80 : 0) + (sum >> 1) + *ext++;
   }
   return (sum);
 }
@@ -464,8 +483,10 @@ static void up_dir()
 static void add_file(char *name, char *filepath, uint32_t size, u_char isDirectory)
 {
   DirEntry entry;
-  unsigned char lfn[LFN_Max_length];
+  unsigned char *lfn, *lfn_original;
   unsigned int lfnlength = 0;
+  lfn = malloc(LFN_Max_length);
+  lfn_original = lfn;
 
   //Make sure it's clear
   memset(&entry, 0, sizeof(DirEntry));
@@ -474,7 +495,7 @@ static void add_file(char *name, char *filepath, uint32_t size, u_char isDirecto
   //Format uses unsigned char so it can potentially handle UTF-16 in the future
   //We don't currently get 7 bit ascii input, so this cast clears the warning
   //and will work correctly with the input we're given
-  format_name_83(current_dir, (unsigned char *)name, strlen(name), entry.DIR_Name, entry.DIR_Ext, (unsigned char *)&lfn, &lfnlength);
+  format_name_83(current_dir, (unsigned char *)name, strlen(name), entry.DIR_Name, entry.DIR_Ext, lfn, &lfnlength);
 
   //Add this filename to the 8.3 linked list to prevent colisions on LFNs
   //If this directory is empty
@@ -495,6 +516,63 @@ static void add_file(char *name, char *filepath, uint32_t size, u_char isDirecto
   memcpy(newFile->Filename, entry.DIR_Name, 8);
   memcpy(newFile->Ext, entry.DIR_Ext, 3);
 
+  //Figure out how many lfn directory entries we'll need
+  int lfnEntryCount = ceil_div(lfnlength, LFN_Chars_Per_Entry);
+  if (lfnEntryCount > LFN_Max_Entries)
+  {
+    lfnEntryCount = LFN_Max_Entries;
+  }
+
+  //No point adding entries if we don't have an LFN
+  if (lfnlength > 0)
+  {
+    //Build the LFN directory entries
+    LfnEntry *lfnEntries = malloc(sizeof(LfnEntry) * lfnEntryCount);
+    memset(lfnEntries, 0xFF, sizeof(LfnEntry) * lfnEntryCount);
+
+    int entryCount = 0;
+    for (int entryCount = 0; entryCount < lfnEntryCount; entryCount++)
+    {
+      int currentEntry = lfnEntryCount - entryCount - 1;
+      //Set the flag on the last entry
+      if (currentEntry == 0)
+      {
+        lfnEntries[currentEntry].LFN_Seq = ((entryCount + 1) & LFN_Seq_Mask) | LFN_First_Flag;
+      }
+      else
+      {
+        lfnEntries[currentEntry].LFN_Seq = (entryCount + 1) & LFN_Seq_Mask;
+      }
+      int chars = min(lfnlength, 5);
+      memset(&lfnEntries[currentEntry].LFN_Name, 0, 10);
+      memcpy(&lfnEntries[currentEntry].LFN_Name, lfn, chars * 2);
+      lfnlength -= chars;
+      lfn += chars * 2;
+
+      lfnEntries[currentEntry].LFN_Attributes = LFN_Attr;
+      lfnEntries[currentEntry].LFN_Type = 0x00;
+      lfnEntries[currentEntry].LFN_Checksum = fn_checksum(entry.DIR_Name, entry.DIR_Ext);
+
+      chars = min(lfnlength, 6);
+      memset(&lfnEntries[currentEntry].LFN_Name2, 0, 12);
+      memcpy(&lfnEntries[currentEntry].LFN_Name2, lfn, chars * 2);
+      lfnlength -= chars;
+      lfn += chars * 2;
+
+      lfnEntries[currentEntry].LFN_Cluster_HI = 0x00;
+      lfnEntries[currentEntry].LFN_Cluster_LO = 0x00;
+
+      chars = min(lfnlength, 2);
+      memset(&lfnEntries[currentEntry].LFN_Name3, 0, 4);
+      memcpy(&lfnEntries[currentEntry].LFN_Name3, lfn, chars * 2);
+      lfnlength -= chars;
+      lfn += chars * 2;
+    }
+
+    dir_add_entry((unsigned char *)lfnEntries, lfnEntryCount);
+    free(lfnEntries);
+  }
+
   //If this is a directory, add the directory bit
   if (isDirectory)
   {
@@ -512,12 +590,10 @@ static void add_file(char *name, char *filepath, uint32_t size, u_char isDirecto
 
   //If the directory entry for this file will require a cluster
   //Then our file will end up in the next cluster after that
-  //So, we need to increment this now to generate the correct entry
+  //So, we need to increase this now to generate the correct entry
   uint32_t filePosition = current_fat_position;
-  if (dir_entry_free() == 0)
-  {
-    filePosition++;
-  }
+  uint32_t clusters_needed = dir_entry_sectors_needed(lfnEntryCount);
+  filePosition += clusters_needed;
 
   entry.DIR_FstClusLO = (uint16_t)(filePosition & 0xFFFF);
   entry.DIR_FstClusHI = (uint16_t)((filePosition & 0xFFFF0000) >> 16);
@@ -565,6 +641,7 @@ static void add_file(char *name, char *filepath, uint32_t size, u_char isDirecto
       dir_add_entry((unsigned char *)&dotentry, 1);
     }
   }
+  free(lfn_original);
 }
 
 //Scan a given folder and recursively add it to the memory space

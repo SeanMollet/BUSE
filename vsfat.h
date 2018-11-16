@@ -94,6 +94,19 @@ typedef struct BootEntry
     uint16_t BS_BootSign;
 } BootEntry;
 
+typedef struct LfnEntry
+{
+    uint8_t LFN_Seq;
+    uint8_t LFN_Name[10];
+    uint8_t LFN_Attributes;
+    uint8_t LFN_Type;
+    uint8_t LFN_Checksum;
+    uint8_t LFN_Name2[12];
+    uint8_t LFN_Cluster_HI;
+    uint8_t LFN_Cluster_LO;
+    uint8_t LFN_Name3[4];
+} LfnEntry;
+
 typedef struct DirEntry
 {
     uint8_t DIR_Name[8];

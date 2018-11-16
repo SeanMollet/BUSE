@@ -1,5 +1,6 @@
 #include "vsfat.h"
 
+int32_t min(int32_t left, int32_t right);
 int8_t arrays_equal(uint8_t *left, uint8_t *right, int8_t length);
 uint32_t ceil_div(uint32_t x, uint32_t y);
 int8_t file_exists(Fat_Directory *current_dir, uint8_t filename[8], uint8_t extension[3]);
