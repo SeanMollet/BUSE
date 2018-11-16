@@ -18,7 +18,7 @@ the following :
     
 To automatically load nbd at boot, execute the following:
 
-    echo "dwc2" | sudo tee -a /etc/modules
+    echo "nbd" | sudo tee -a /etc/modules
     
 Then, vsfat can be launched automatically from rc.local or systemd, followed by the
 usb device module.
