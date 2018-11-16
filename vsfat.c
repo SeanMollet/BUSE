@@ -520,6 +520,14 @@ static int dir_add_entry(unsigned char *entry, u_int32_t length)
   if (current_dir->dirtables == 0)
   {
     current_dir->dirtables = malloc(sizeof(DirTable));
+    current_dir->dirtables->next = 0;
+
+    current_dir->dirtables->dirtable = malloc(cluster_size);
+    u_int64_t dest = address_from_fatclus(current_dir->dir_location);
+    add_address_region(dest, cluster_size, current_dir->dirtables->dirtable, 0);
+    current_cluster_free = entrys_per_cluster;
+
+    memcpy(&fat[current_dir->dir_location], fat_end, sizeof(fat_end)); // Terminate this chain in the FAT
   }
 
   //We don't let re-alloc do this, because we need to grab cluster 2 for the first one
@@ -527,12 +535,6 @@ static int dir_add_entry(unsigned char *entry, u_int32_t length)
   //Make sure the DIR exists
   if (current_dir->dirtables->dirtable == 0)
   {
-    current_dir->dirtables->dirtable = malloc(cluster_size);
-    u_int64_t dest = address_from_fatclus(current_dir->dir_location);
-    add_address_region(dest, cluster_size, current_dir->dirtables->dirtable, 0);
-    current_cluster_free = entrys_per_cluster;
-
-    memcpy(&fat[current_dir->dir_location], fat_end, sizeof(fat_end)); // Terminate this chain in the FAT
   }
 
   //Make sure we don't exceed the 2Mb limit for directory size
@@ -560,7 +562,8 @@ static int dir_add_entry(unsigned char *entry, u_int32_t length)
     final_dir_table = final_dir_table->next;
 
     final_dir_table->dirtable = malloc(cluster_size);
-    add_address_region(address_from_fatclus(current_fat_position), cluster_size, final_dir_table, 0);
+    final_dir_table->next = 0;
+    add_address_region(address_from_fatclus(current_fat_position), cluster_size, final_dir_table->dirtable, 0);
 
     //Update the fat for the previous link in the chain to point to the new one
     fat[current_dir->dir_location] = current_fat_position;
