@@ -30,15 +30,15 @@ static void build_files()
 }
 
 //Test the read function
-static void testRead(u_int32_t size, u_int32_t location)
+static void testRead(uint32_t size, uint32_t location)
 {
 
-    //  u_int32_t size=atoi(argv[2]); // 100;
-    //  u_int32_t location = part1_base + atoi(argv[3]);// 3072;
+    //  uint32_t size=atoi(argv[2]); // 100;
+    //  uint32_t location = part1_base + atoi(argv[3]);// 3072;
     unsigned char *buf = malloc(size);
     xmp_read(buf, size, location, &xmpl_debug);
 
-    u_int32_t pos = 0;
+    uint32_t pos = 0;
     while (size > 0)
     {
         if (pos % 8 == 0)

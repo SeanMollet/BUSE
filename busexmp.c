@@ -26,7 +26,7 @@
 static void *data;
 static int xmpl_debug = 1;
 
-static int xmp_read(void *buf, u_int32_t len, u_int64_t offset, void *userdata)
+static int xmp_read(void *buf, uint32_t len, uint64_t offset, void *userdata)
 {
   if (*(int *)userdata)
     fprintf(stderr, "R - %lu, %u\n", offset, len);
@@ -34,7 +34,7 @@ static int xmp_read(void *buf, u_int32_t len, u_int64_t offset, void *userdata)
   return 0;
 }
 
-static int xmp_write(const void *buf, u_int32_t len, u_int64_t offset, void *userdata)
+static int xmp_write(const void *buf, uint32_t len, uint64_t offset, void *userdata)
 {
   if (*(int *)userdata)
     fprintf(stderr, "W - %lu, %u\n", offset, len);
@@ -55,32 +55,32 @@ static int xmp_flush(void *userdata)
   return 0;
 }
 
-static int xmp_trim(u_int64_t from, u_int32_t len, void *userdata)
+static int xmp_trim(uint64_t from, uint32_t len, void *userdata)
 {
   (void)(userdata);
   fprintf(stderr, "T - %lu, %u\n", from, len);
   return 0;
 }
 
-
 static struct buse_operations aop = {
-  .read = xmp_read,
-  .write = xmp_write,
-  .disc = xmp_disc,
-  .flush = xmp_flush,
-  .trim = xmp_trim,
-  .size = 128 * 1024 * 1024,
+    .read = xmp_read,
+    .write = xmp_write,
+    .disc = xmp_disc,
+    .flush = xmp_flush,
+    .trim = xmp_trim,
+    .size = 128 * 1024 * 1024,
 };
 
 int main(int argc, char *argv[])
 {
   if (argc != 2)
   {
-    fprintf(stderr, 
-        "Usage:\n"
-        "  %s /dev/nbd0\n"
-        "Don't forget to load nbd kernel module (`modprobe nbd`) and\n"
-        "run example from root.\n", argv[0]);
+    fprintf(stderr,
+            "Usage:\n"
+            "  %s /dev/nbd0\n"
+            "Don't forget to load nbd kernel module (`modprobe nbd`) and\n"
+            "run example from root.\n",
+            argv[0]);
     return 1;
   }
 

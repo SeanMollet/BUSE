@@ -36,18 +36,18 @@
  * These helper functions were taken from cliserv.h in the nbd distribution.
  */
 #ifdef WORDS_BIGENDIAN
-u_int64_t ntohll(u_int64_t a)
+uint64_t ntohll(uint64_t a)
 {
   return a;
 }
 #else
-u_int64_t ntohll(u_int64_t a)
+uint64_t ntohll(uint64_t a)
 {
-  u_int32_t lo = a & 0xffffffff;
-  u_int32_t hi = a >> 32U;
+  uint32_t lo = a & 0xffffffff;
+  uint32_t hi = a >> 32U;
   lo = ntohl(lo);
   hi = ntohl(hi);
-  return ((u_int64_t)lo) << 32U | hi;
+  return ((uint64_t)lo) << 32U | hi;
 }
 #endif
 #define htonll ntohll
@@ -88,8 +88,8 @@ int buse_main(const char *dev_file, const struct buse_operations *aop, void *use
 {
   int sp[2];
   int nbd, sk, err, tmp_fd;
-  u_int64_t from;
-  u_int32_t len;
+  uint64_t from;
+  uint32_t len;
   ssize_t bytes_read;
   struct nbd_request request;
   struct nbd_reply reply;

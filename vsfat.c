@@ -28,37 +28,29 @@
 #include "vsfat.h"
 #include "Fat32_Attr.h"
 #include "utils.h"
+#include "setup.h"
+#include "address.h"
 
 static unsigned char *mbr;
-static const u_int32_t part1_base = 1048576;
 
-static BootEntry bootentry;
+BootEntry bootentry;
 
-static u_int32_t *fat = 0;
-static u_int32_t current_fat_position = 3; // 0 and 1 are special and 2 is the root dir
+static uint32_t *fat = 0;
+static uint32_t current_fat_position = 3; // 0 and 1 are special and 2 is the root dir
 static unsigned char fat_end[] = {0xFF, 0xFF, 0xFF, 0xFF};
 
 Fat_Directory root_dir;
 Fat_Directory *current_dir;
 
-static AddressRegion *address_regions;
-static u_int32_t address_regions_count;
-
 static int xmpl_debug = 1;
 
-static int xmp_read(void *buf, u_int32_t len, u_int64_t offset,
+static int xmp_read(void *buf, uint32_t len, uint64_t offset,
                     void *userdata);
-static int xmp_write(const void *buf, u_int32_t len, u_int64_t offset,
+static int xmp_write(const void *buf, uint32_t len, uint64_t offset,
                      void *userdata);
 static void xmp_disc(void *userdata);
 static int xmp_flush(void *userdata);
-static int xmp_trim(u_int64_t from, u_int32_t len, void *userdata);
-static void add_address_region(u_int64_t base, u_int64_t length,
-                               void *mem_pointer, char *file_path);
-static u_int64_t address_from_fatclus(u_int32_t fatclus);
-static u_int32_t fat_location(u_int32_t fatnum);
-
-static u_int32_t root_dir_loc();
+static int xmp_trim(uint64_t from, uint32_t len, void *userdata);
 
 static struct buse_operations aop = {
     .read = xmp_read,
@@ -71,7 +63,7 @@ static struct buse_operations aop = {
 };
 
 //API Functions
-static int xmp_read(void *buf, u_int32_t len, u_int64_t offset, void *userdata)
+static int xmp_read(void *buf, uint32_t len, uint64_t offset, void *userdata)
 {
   if (*(int *)userdata)
   {
@@ -85,7 +77,7 @@ static int xmp_read(void *buf, u_int32_t len, u_int64_t offset, void *userdata)
   memset(buf, 0, len);
   //Check if this read falls within a mapped area
   //No point doing this if we've already used up len
-  for (u_int32_t a = 0; a < address_regions_count && len > 0; a++)
+  for (uint32_t a = 0; a < address_regions_count && len > 0; a++)
   {
     if ((offset >= address_regions[a].base && // See if the beginning is inside our range
          offset <= address_regions[a].base + address_regions[a].length) ||
@@ -94,9 +86,9 @@ static int xmp_read(void *buf, u_int32_t len, u_int64_t offset, void *userdata)
         (offset <= address_regions[a].base && //Or, we're entirely contained within it
          offset + len >= address_regions[a].base + address_regions[a].length))
     {
-      u_int32_t uselen = len;
-      u_int32_t usepos;
-      u_int32_t usetarget;
+      uint32_t uselen = len;
+      uint32_t usepos;
+      uint32_t usetarget;
 
       //Figure out who's first and set the offset variables accordingly
       if (offset < address_regions[a].base)
@@ -192,7 +184,7 @@ static int xmp_read(void *buf, u_int32_t len, u_int64_t offset, void *userdata)
   return 0;
 }
 
-static int xmp_write(const void *buf, u_int32_t len, u_int64_t offset, void *userdata)
+static int xmp_write(const void *buf, uint32_t len, uint64_t offset, void *userdata)
 {
   (void)buf;
   if (*(int *)userdata)
@@ -204,7 +196,7 @@ static int xmp_write(const void *buf, u_int32_t len, u_int64_t offset, void *use
 #endif
   }
 
-  if (offset > (u_int64_t)aop.blksize * aop.size_blocks)
+  if (offset > (uint64_t)aop.blksize * aop.size_blocks)
   {
     return 0;
   }
@@ -225,7 +217,7 @@ static int xmp_flush(void *userdata)
   return 0;
 }
 
-static int xmp_trim(u_int64_t from, u_int32_t len, void *userdata)
+static int xmp_trim(uint64_t from, uint32_t len, void *userdata)
 {
   if (*(int *)userdata)
   {
@@ -236,172 +228,6 @@ static int xmp_trim(u_int64_t from, u_int32_t len, void *userdata)
 #endif
   }
   return 0;
-}
-
-//Add an address region to the mapped address regions array
-static void add_address_region(u_int64_t base, u_int64_t length, void *mem_pointer,
-                               char *file_path)
-{
-  address_regions_count++;
-  address_regions =
-      realloc(address_regions, address_regions_count * sizeof(AddressRegion));
-  address_regions[address_regions_count - 1].base = base;
-  address_regions[address_regions_count - 1].length = length;
-  address_regions[address_regions_count - 1].mem_pointer = mem_pointer;
-  address_regions[address_regions_count - 1].file_path = file_path;
-}
-
-//Build and map the MBR. Note that we just use a fixed 2TB size
-static void build_mbr()
-{
-  unsigned char bootcode[] =
-      {0xFA, 0xB8, 0x00, 0x10, 0x8E, 0xD0, 0xBC, 0x00, 0xB0, 0xB8, 0x00, 0x00,
-       0x8E, 0xD8, 0x8E, 0xC0, 0xFB, 0xBE, 0x00, 0x7C, 0xBF, 0x00, 0x06, 0xB9, 0x00, 0x02, 0xF3, 0xA4,
-       0xEA, 0x21, 0x06, 0x00, 0x00, 0xBE, 0xBE, 0x07, 0x38, 0x04, 0x75, 0x0B, 0x83, 0xC6, 0x10, 0x81,
-       0xFE, 0xFE, 0x07, 0x75, 0xF3, 0xEB, 0x16, 0xB4, 0x02, 0xB0, 0x01, 0xBB, 0x00, 0x7C, 0xB2, 0x80,
-       0x8A, 0x74, 0x01, 0x8B, 0x4C, 0x02, 0xCD, 0x13, 0xEA, 0x00, 0x7C, 0x00, 0x00, 0xEB, 0xFE, 0x00};
-  unsigned char serial[] = {0xDE, 0xAB, 0xBE, 0xEF};
-  unsigned char parts[4][16] =
-      {{0x00, 0x20, 0x21, 0x00, 0x0c, 0xcd, 0xfb, 0xd2, 0x00, 0x08, 0x00, 0x00,
-        0x00, 0xf8, 0xdf, 0xff},
-       {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00},
-       {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00},
-       {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00}};
-  unsigned char footer[] = {0x55, 0xAA};
-
-  mbr = malloc(512);
-  memset(mbr, 0, 512);
-
-  memcpy(mbr, &bootcode, sizeof(bootcode));
-  memcpy(mbr + 440, &serial, sizeof(serial));
-
-  for (int a = 0; a < 4; a++)
-  {
-    memcpy(mbr + 446 + 16 * a, &parts[a], 16);
-  }
-  memcpy(mbr + 510, &footer, sizeof(footer));
-  add_address_region(0, 512, mbr, 0);
-}
-
-//Build and map the bootsector(s)
-static void build_boot_sector()
-{
-
-  //Build our bootsector
-  bootentry.BS_jmpBoot[0] = 0xeb;
-  bootentry.BS_jmpBoot[1] = 0x58;
-  bootentry.BS_jmpBoot[2] = 0x90;
-  strncpy((char *)&bootentry.BS_OEMName, "MSDOS5.0", 8);
-  //
-  bootentry.BPB_BytsPerSec = 512;
-  //Eventually this will need to be turned up to get full capacity
-  bootentry.BPB_SecPerClus = 1;
-  bootentry.BPB_RsvdSecCnt = 32;
-  bootentry.BPB_NumFATs = 2;
-  bootentry.BPB_RootEntCnt = 0;
-  bootentry.BPB_TotSec16 = 0;
-  bootentry.BPB_Media = 248;
-  bootentry.BPB_FATSz16 = 0;
-  bootentry.BPB_SecPerTrk = 32;
-  bootentry.BPB_NumHeads = 64;
-  bootentry.BPB_HiddSec = 0;
-  bootentry.BPB_TotSec32 = 102400;
-  bootentry.BPB_FATSz32 = 788;
-  bootentry.BPB_ExtFlags = 0;
-  bootentry.BPB_FSVer = 0;
-  bootentry.BPB_RootClus = 2;
-  bootentry.BPB_FSInfo = 1;
-  bootentry.BPB_BkBootSec = 6;
-  bootentry.BS_DrvNum = 128;
-  bootentry.BS_Reserved1 = 0;
-  bootentry.BS_BootSig = 29;
-  bootentry.BS_VolID = 0x8456f237;
-  bootentry.BS_BootSign = 0xAA55;
-
-  unsigned char vol[] =
-      {0x56, 0x53, 0x46, 0x41, 0x54, 0x46, 0x53, 0x20, 0x20, 0x20, 0x20};
-  unsigned char fstype[] = {0x46, 0x41, 0x54, 0x33, 0x32, 0x20, 0x20, 0x20};
-
-  memcpy(&bootentry.BS_VolLab, vol, sizeof(vol));
-  memcpy(&bootentry.BS_FilSysType, fstype, sizeof(fstype));
-  if (xmpl_debug)
-  {
-    printBootSect(bootentry);
-    fprintf(stderr, "BS 1: %x\n", part1_base);
-    fprintf(stderr, "BS 2: %x\n",
-            part1_base +
-                bootentry.BPB_BkBootSec * bootentry.BPB_BytsPerSec);
-  }
-
-  //Main copy
-  add_address_region(part1_base, 512, &bootentry, 0);
-  add_address_region(part1_base +
-                         bootentry.BPB_BkBootSec * bootentry.BPB_BytsPerSec,
-                     512,
-                     &bootentry, 0);
-}
-
-//Return a memory address given a fat sector
-static u_int64_t address_from_fatsec(u_int32_t fatsec)
-{
-  return (u_int64_t)part1_base +
-         (u_int64_t)bootentry.BPB_BytsPerSec * fatsec;
-}
-
-//Return a memory address given a fat cluster
-static u_int64_t address_from_fatclus(u_int32_t fatclus)
-{
-  return (u_int64_t)address_from_fatsec(fat_location(bootentry.BPB_NumFATs)) +
-         (u_int64_t)bootentry.BPB_BytsPerSec * bootentry.BPB_SecPerClus * (fatclus - 2);
-}
-
-//Find either of the FATS
-static u_int32_t fat_location(u_int32_t fatnum)
-{
-  return bootentry.BPB_RsvdSecCnt + bootentry.BPB_FATSz32 * fatnum;
-}
-
-//Reverse lookup a cluster given an address
-static u_int32_t clus_from_addr(u_int64_t address)
-{
-  u_int64_t fatbase = address_from_fatclus(root_dir_loc());
-  if (address < fatbase)
-  {
-    return 0;
-  }
-  //Subtract the base
-  address -= fatbase;
-  return address / (bootentry.BPB_BytsPerSec * bootentry.BPB_SecPerClus) + 2;
-}
-
-//Reverse lookup a fat from an address
-static u_int32_t fat_entry_from_addr(u_int64_t address)
-{
-  //We just use the first fat since we shouldn't be updating anyway
-  //Fat entries are 32 bits long, so we *4
-  u_int32_t cluster = clus_from_addr(address);
-  return address_from_fatsec(fat_location(0)) + cluster * 4;
-}
-
-//Returns the location of the root_dir
-static u_int32_t root_dir_loc()
-{
-  //BPB_NumFATs is 1 based, so this actually gives us the end of the last fat
-  //return fat_location(bootentry.BPB_NumFATs);
-  //Fat hard codes the root directory to be the first sector
-  return 2;
-}
-
-static u_int32_t data_loc()
-{
-  //The formula for this is:
-  //DataStartSector = RootDirStartSector + RootDirSectors;
-  //RootDirSectors = (32 * BPB_RootEntCnt + BPB_BytsPerSec - 1) / BPB_BytsPerSec;
-  //We're 100% FAT32, so BPB_RootEntCnt=0, which makes RootDirSectors = (511)/512 = 1
-  return root_dir_loc() + 1;
 }
 
 //Do the initial FAT setup and mapping
@@ -459,7 +285,7 @@ static void fat_find_free()
 //This will load the proper mappings and configure the fat
 //Directory entries should be handled above here
 //This assumes we have 0 fragmentation (which should always be true, since we don't allow deleting)
-static int fat_new_file(unsigned char *data, char *filepath, u_int32_t length)
+static int fat_new_file(unsigned char *data, char *filepath, uint32_t length)
 {
   //Get a free cluster
   fat_find_free();
@@ -470,8 +296,8 @@ static int fat_new_file(unsigned char *data, char *filepath, u_int32_t length)
   }
 
   //Make sure we have enough space
-  u_int32_t cluster_size = (bootentry.BPB_BytsPerSec * bootentry.BPB_SecPerClus);
-  u_int32_t clusters_required = ceil_div(length, cluster_size); //Ceiling division
+  uint32_t cluster_size = (bootentry.BPB_BytsPerSec * bootentry.BPB_SecPerClus);
+  uint32_t clusters_required = ceil_div(length, cluster_size); //Ceiling division
   if (clusters_required >
       ((bootentry.BPB_FATSz32 * bootentry.BPB_BytsPerSec) / 4) - current_fat_position)
   { //Free clusters
@@ -510,11 +336,11 @@ static int fat_new_file(unsigned char *data, char *filepath, u_int32_t length)
 }
 
 //This does accept multiple entries. However, it does not accept more than a single file worth
-static int dir_add_entry(unsigned char *entry, u_int32_t length)
+static int dir_add_entry(unsigned char *entry, uint32_t length)
 {
-  u_int32_t cluster_size = (bootentry.BPB_BytsPerSec * bootentry.BPB_SecPerClus);
-  u_int32_t entrys_per_cluster = cluster_size / sizeof(DirEntry);
-  u_int32_t current_cluster_free = current_dir->current_dir_position % entrys_per_cluster;
+  uint32_t cluster_size = (bootentry.BPB_BytsPerSec * bootentry.BPB_SecPerClus);
+  uint32_t entrys_per_cluster = cluster_size / sizeof(DirEntry);
+  uint32_t current_cluster_free = current_dir->current_dir_position % entrys_per_cluster;
 
   //Make sure we have an initial entry
   if (current_dir->dirtables == 0)
@@ -525,7 +351,7 @@ static int dir_add_entry(unsigned char *entry, u_int32_t length)
     current_dir->dirtables->dirtable = malloc(cluster_size);
     memset(current_dir->dirtables->dirtable, 0, cluster_size);
 
-    u_int64_t dest = address_from_fatclus(current_dir->dir_location);
+    uint64_t dest = address_from_fatclus(current_dir->dir_location);
     add_address_region(dest, cluster_size, current_dir->dirtables->dirtable, 0);
     current_cluster_free = entrys_per_cluster;
 
@@ -550,7 +376,7 @@ static int dir_add_entry(unsigned char *entry, u_int32_t length)
   {
     fat_find_free();
 
-    u_int32_t used_clusters = ceil_div(current_dir->current_dir_position, entrys_per_cluster);
+    uint32_t used_clusters = ceil_div(current_dir->current_dir_position, entrys_per_cluster);
 
     //Add a new entry to the dirtables linked list
     //Find the end of the list
@@ -577,7 +403,7 @@ static int dir_add_entry(unsigned char *entry, u_int32_t length)
 
   //Find the last dir_table in this chain and the last unused position
   DirTable *final_dir_table = current_dir->dirtables;
-  u_int32_t final_table_pos = current_dir->current_dir_position;
+  uint32_t final_table_pos = current_dir->current_dir_position;
   while (final_dir_table->next != 0)
   {
     final_dir_table = final_dir_table->next;
@@ -594,7 +420,7 @@ static int dir_add_entry(unsigned char *entry, u_int32_t length)
 //Long filename checksum of SFN
 static unsigned char fn_checksum(unsigned char *filename)
 {
-  u_int8_t filename_len;
+  uint8_t filename_len;
   unsigned char sum;
 
   sum = 0;
@@ -607,7 +433,7 @@ static unsigned char fn_checksum(unsigned char *filename)
 }
 
 //Convert filename to FAT32 8.3 format
-static void format_name_83(char *input, u_int32_t length, unsigned char *filename, unsigned char *ext)
+static void format_name_83(char *input, uint32_t length, unsigned char *filename, unsigned char *ext)
 {
   int32_t period = -1;
   //First we take out things we know don't belong
@@ -676,7 +502,7 @@ static void up_dir()
 }
 
 //Add a file to the mapping space
-static void add_file(char *name, char *filepath, u_int32_t size, u_char isDirectory)
+static void add_file(char *name, char *filepath, uint32_t size, u_char isDirectory)
 {
   DirEntry entry;
   //Make sure it's clear
@@ -707,8 +533,8 @@ static void add_file(char *name, char *filepath, u_int32_t size, u_char isDirect
 
   fat_find_free();
 
-  entry.DIR_FstClusLO = (u_int16_t)(current_fat_position & 0xFFFF);
-  entry.DIR_FstClusHI = (u_int16_t)((current_fat_position & 0xFFFF0000) >> 16);
+  entry.DIR_FstClusLO = (uint16_t)(current_fat_position & 0xFFFF);
+  entry.DIR_FstClusHI = (uint16_t)((current_fat_position & 0xFFFF0000) >> 16);
   entry.DIR_FileSize = size;
 
   //dir_add_entry wants a byte array so it can have multiple entries chained together
@@ -741,14 +567,14 @@ static void add_file(char *name, char *filepath, u_int32_t size, u_char isDirect
       memset(&dotentry, 0, sizeof(DirEntry));
       dotentry.DIR_Attr = DIR_Attr_Archive | DIR_Attr_Directory;
       dotentry.DIR_Name[0] = '.';
-      dotentry.DIR_FstClusLO = (u_int16_t)(current_fat_position & 0x00FF);
-      dotentry.DIR_FstClusHI = (u_int16_t)(current_fat_position & 0xFF00) >> 16;
+      dotentry.DIR_FstClusLO = (uint16_t)(current_fat_position & 0x00FF);
+      dotentry.DIR_FstClusHI = (uint16_t)(current_fat_position & 0xFF00) >> 16;
       dir_add_entry((unsigned char *)&dotentry, 1);
 
       //..
       dotentry.DIR_Name[1] = '.';
-      dotentry.DIR_FstClusLO = (u_int16_t)(current_dir->parent->dir_location & 0x00FF);
-      dotentry.DIR_FstClusHI = (u_int16_t)(current_dir->parent->dir_location & 0xFF00) >> 16;
+      dotentry.DIR_FstClusLO = (uint16_t)(current_dir->parent->dir_location & 0x00FF);
+      dotentry.DIR_FstClusHI = (uint16_t)(current_dir->parent->dir_location & 0xFF00) >> 16;
       dir_add_entry((unsigned char *)&dotentry, 1);
     }
   }
@@ -815,8 +641,8 @@ int main(int argc, char *argv[])
     return 1;
   }
 
-  build_mbr();
-  build_boot_sector();
+  build_mbr(mbr);
+  build_boot_sector(&bootentry, xmpl_debug);
   build_fats();
   scan_folder(argv[2]);
 

@@ -20,6 +20,7 @@
 #ifndef VSFAT_H_INCLUDED
 #define VSFAT_H_INCLUDED
 
+#include <stdint.h>
 #include <linux/limits.h>
 
 //Check bitness of where we're being built and handle appropriately
@@ -45,82 +46,77 @@ typedef struct Fat_Directory
 {
     char *path;
     DirTable *dirtables;
-    u_int32_t current_dir_position;
-    u_int32_t dir_location;
+    uint32_t current_dir_position;
+    uint32_t dir_location;
     struct Fat_Directory *parent;
 } Fat_Directory;
-
-typedef struct AddressRegion
-{
-    u_int64_t base;
-    u_int64_t length;
-    void *mem_pointer;
-    char *file_path;
-} AddressRegion;
 
 #pragma pack(push, 1) /* BYTE align in memory (no padding) */
 typedef struct BootEntry
 {
-    u_int8_t BS_jmpBoot[3];
-    u_int8_t BS_OEMName[8];
-    u_int16_t BPB_BytsPerSec;
-    u_int8_t BPB_SecPerClus;
-    u_int16_t BPB_RsvdSecCnt;
-    u_int8_t BPB_NumFATs;
-    u_int16_t BPB_RootEntCnt;
-    u_int16_t BPB_TotSec16;
-    u_int8_t BPB_Media;
-    u_int16_t BPB_FATSz16;
-    u_int16_t BPB_SecPerTrk;
-    u_int16_t BPB_NumHeads;
-    u_int32_t BPB_HiddSec;
-    u_int32_t BPB_TotSec32;
-    u_int32_t BPB_FATSz32;
-    u_int16_t BPB_ExtFlags;
-    u_int16_t BPB_FSVer;
-    u_int32_t BPB_RootClus;
-    u_int16_t BPB_FSInfo;
-    u_int16_t BPB_BkBootSec;
-    u_int8_t BPB_Reserved[12];
-    u_int8_t BS_DrvNum;
-    u_int8_t BS_Reserved1;
-    u_int8_t BS_BootSig;
-    u_int32_t BS_VolID;
-    u_int8_t BS_VolLab[11];
-    u_int8_t BS_FilSysType[8];
-    u_int8_t BS_BootCode32[420];
-    u_int16_t BS_BootSign;
+    uint8_t BS_jmpBoot[3];
+    uint8_t BS_OEMName[8];
+    uint16_t BPB_BytsPerSec;
+    uint8_t BPB_SecPerClus;
+    uint16_t BPB_RsvdSecCnt;
+    uint8_t BPB_NumFATs;
+    uint16_t BPB_RootEntCnt;
+    uint16_t BPB_TotSec16;
+    uint8_t BPB_Media;
+    uint16_t BPB_FATSz16;
+    uint16_t BPB_SecPerTrk;
+    uint16_t BPB_NumHeads;
+    uint32_t BPB_HiddSec;
+    uint32_t BPB_TotSec32;
+    uint32_t BPB_FATSz32;
+    uint16_t BPB_ExtFlags;
+    uint16_t BPB_FSVer;
+    uint32_t BPB_RootClus;
+    uint16_t BPB_FSInfo;
+    uint16_t BPB_BkBootSec;
+    uint8_t BPB_Reserved[12];
+    uint8_t BS_DrvNum;
+    uint8_t BS_Reserved1;
+    uint8_t BS_BootSig;
+    uint32_t BS_VolID;
+    uint8_t BS_VolLab[11];
+    uint8_t BS_FilSysType[8];
+    uint8_t BS_BootCode32[420];
+    uint16_t BS_BootSign;
 } BootEntry;
 
 typedef struct DirEntry
 {
-    u_int8_t DIR_Name[8];
-    u_int8_t DIR_Ext[3];
-    u_int8_t DIR_Attr;
-    u_int8_t DIR_NTRes;
-    u_int8_t DIR_CrtTimeTenth;
-    u_int16_t DIR_CrtTime;
-    u_int16_t DIR_CrtDate;
-    u_int16_t DIR_LstAccDate;
-    u_int16_t DIR_FstClusHI;
-    u_int16_t DIR_WrtTime;
-    u_int16_t DIR_WrtDate;
-    u_int16_t DIR_FstClusLO;
-    u_int32_t DIR_FileSize;
+    uint8_t DIR_Name[8];
+    uint8_t DIR_Ext[3];
+    uint8_t DIR_Attr;
+    uint8_t DIR_NTRes;
+    uint8_t DIR_CrtTimeTenth;
+    uint16_t DIR_CrtTime;
+    uint16_t DIR_CrtDate;
+    uint16_t DIR_LstAccDate;
+    uint16_t DIR_FstClusHI;
+    uint16_t DIR_WrtTime;
+    uint16_t DIR_WrtDate;
+    uint16_t DIR_FstClusLO;
+    uint32_t DIR_FileSize;
 } DirEntry;
 
 typedef struct LDirEntry
 {
-    u_int8_t LDIR_Ord;
+    uint8_t LDIR_Ord;
     unsigned char LDIR_Name1[10]; //Char 1-5
-    u_int8_t LDIR_Attr;
-    u_int8_t LDIR_Type;
-    u_int8_t LDIR_Chksum;
+    uint8_t LDIR_Attr;
+    uint8_t LDIR_Type;
+    uint8_t LDIR_Chksum;
     unsigned char LDIR_Name2[12]; //Char 6-11
-    u_int16_t LDIR_FstClusLO;
+    uint16_t LDIR_FstClusLO;
     unsigned char LDIR_Name3[4]; //Char 12-13
 } LDirEntry;
 
 #pragma pack(pop)
+
+//Global variables
+extern BootEntry bootentry;
 
 #endif /* VSFAT_H_INCLUDED */
