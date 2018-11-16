@@ -4,3 +4,4 @@
 #define DIR_Attr_Volume_ID 0x08
 #define DIR_Attr_Directory 0x10
 #define DIR_Attr_Archive 0x20
+#define DIR_LFN 0x0F

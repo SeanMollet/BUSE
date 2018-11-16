@@ -256,10 +256,15 @@ static void build_fats()
   add_address_region(address_from_fatsec(fat_location(1)),
                      bootentry.BPB_FATSz32 * bootentry.BPB_BytsPerSec, fat,
                      0);
+}
 
+//Create the root directory entry and set it as the current directory
+static void build_root_dir()
+{
   root_dir.path = "\\";
   root_dir.current_dir_position = 0;
   root_dir.dirtables = 0;
+  root_dir.files = 0;
   //This makes sure we can never go above the root_dir
   root_dir.parent = &root_dir;
   root_dir.dir_location = root_dir_loc();
@@ -517,6 +522,17 @@ static void add_file(char *name, char *filepath, uint32_t size, u_char isDirecto
   //For now, just stupid 8.3
   format_name_83(name, strlen(name), entry.DIR_Name, entry.DIR_Ext);
 
+  //Add this filename to the 8.3 linked list to prevent colisions on LFNs
+  FileEntry *newFile = current_dir->files;
+  while (newFile != 0)
+  {
+    newFile = newFile->next;
+  }
+  newFile = malloc(sizeof(FileEntry));
+  memset(newFile, 0, sizeof(FileEntry));
+  memcpy(newFile->Filename, entry.DIR_Name, 8);
+  memcpy(newFile->Ext, entry.DIR_Ext, 3);
+
   /*  memcpy(entry.DIR_Ext,name + strlen(name)-3,3);
   memcpy(entry.DIR_Name,name,8);
 
@@ -562,6 +578,7 @@ static void add_file(char *name, char *filepath, uint32_t size, u_char isDirecto
       new_dir->current_dir_position = 0;
       new_dir->parent = current_dir;
       new_dir->dir_location = current_fat_position;
+      new_dir->files = 0;
       current_dir = new_dir;
 
       //Add the . and .. entries to this dir
@@ -650,6 +667,7 @@ int main(int argc, char *argv[])
   build_mbr(mbr);
   build_boot_sector(&bootentry, xmpl_debug);
   build_fats();
+  build_root_dir();
   scan_folder(argv[2]);
 
   return buse_main(argv[1], &aop, (void *)&xmpl_debug);

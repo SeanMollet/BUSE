@@ -25,12 +25,20 @@
 
 //Check bitness of where we're being built and handle appropriately
 #if __GNUC__
-#if __x86_64__ || __ppc64__
+#if __x86_64__ || __ppc64__ || __aarch64__
 #define ENV64BIT
 #else
 #define ENV32BIT
 #endif
 #endif
+
+//Linked list for files in a directory
+typedef struct FileEntry
+{
+    unsigned char Filename[8];
+    unsigned char Ext[3];
+    struct FileEntry *next;
+} FileEntry;
 
 //Linked list for the DirTables
 typedef struct DirTable
@@ -48,6 +56,7 @@ typedef struct Fat_Directory
     DirTable *dirtables;
     uint32_t current_dir_position;
     uint32_t dir_location;
+    FileEntry *files;
     struct Fat_Directory *parent;
 } Fat_Directory;
 
