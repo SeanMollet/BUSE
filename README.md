@@ -37,7 +37,7 @@ on setting this up. Pertinent sections reproduced here.
 2. **(step only needed if running Raspbain version before 2016-05-10)** Once it starts up again, run ```sudo BRANCH=next rpi-update```. This will take a while.  
 3. Next we need to make sure we are using the dwc2 USB driver ```echo "dtoverlay=dwc2" | sudo tee -a /boot/config.txt```.
 4. And enable it in Raspbian ```echo "dwc2" | sudo tee -a /etc/modules```
-5. Need to now pick which module you want to use from the list above, for example for ethernet ```echo "g_ether" | sudo tee -a /etc/modules```. You can only pick one of the above modules to use at a time.   
+5. Do not load the device module at boot by echoing to /etc/modules. It needs to be run AFTER vsFat is running.
     
 ### Using the modules
 
