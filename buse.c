@@ -192,7 +192,7 @@ int buse_main(const char *dev_file, const struct buse_operations *aop, void *use
     case NBD_CMD_READ:
       if (*(int *)userdata)
       {
-        fprintf(stderr, "Request for read of size %d from %llu\n", len, from);
+        fprintf(stderr, "Request for read of size %d from %lu\n", len, from);
       }
       /* Fill with zero in case actual read is not implemented */
       chunk = malloc(len);
