@@ -523,6 +523,8 @@ static int dir_add_entry(unsigned char *entry, u_int32_t length)
     current_dir->dirtables->next = 0;
 
     current_dir->dirtables->dirtable = malloc(cluster_size);
+    memset(current_dir->dirtables->dirtable, 0, cluster_size);
+
     u_int64_t dest = address_from_fatclus(current_dir->dir_location);
     add_address_region(dest, cluster_size, current_dir->dirtables->dirtable, 0);
     current_cluster_free = entrys_per_cluster;
@@ -562,6 +564,7 @@ static int dir_add_entry(unsigned char *entry, u_int32_t length)
     final_dir_table = final_dir_table->next;
 
     final_dir_table->dirtable = malloc(cluster_size);
+    memset(final_dir_table->dirtable, 0, cluster_size);
     final_dir_table->next = 0;
     add_address_region(address_from_fatclus(current_fat_position), cluster_size, final_dir_table->dirtable, 0);
 
@@ -703,8 +706,9 @@ static void add_file(char *name, char *filepath, u_int32_t size, u_char isDirect
   //entry.DIR_NRRes = 0x08 | 0x10; //Everything is lowercase
 
   fat_find_free();
-  entry.DIR_FstClusLO = (u_int16_t)(current_fat_position & 0x00FF);
-  entry.DIR_FstClusHI = (u_int16_t)(current_fat_position & 0xFF00) >> 16;
+
+  entry.DIR_FstClusLO = (u_int16_t)(current_fat_position & 0xFFFF);
+  entry.DIR_FstClusHI = (u_int16_t)((current_fat_position & 0xFFFF0000) >> 16);
   entry.DIR_FileSize = size;
 
   //dir_add_entry wants a byte array so it can have multiple entries chained together
