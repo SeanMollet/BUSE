@@ -477,22 +477,23 @@ static void add_file(char *name, char *filepath, uint32_t size, u_char isDirecto
   format_name_83(current_dir, (unsigned char *)name, strlen(name), entry.DIR_Name, entry.DIR_Ext, (unsigned char *)&lfn, &lfnlength);
 
   //Add this filename to the 8.3 linked list to prevent colisions on LFNs
+  //If this directory is empty
+  if (current_dir->files == 0)
+  {
+    current_dir->files = malloc(sizeof(FileEntry));
+    current_dir->files->next = 0;
+  }
+
+  //Find the last entry (which is a new entry)
   FileEntry *newFile = current_dir->files;
-  while (newFile != 0)
+  while (newFile->next != 0)
   {
     newFile = newFile->next;
   }
-  newFile = malloc(sizeof(FileEntry));
-  memset(newFile, 0, sizeof(FileEntry));
+  newFile->next = malloc(sizeof(FileEntry));
+  memset(newFile->next, 0, sizeof(FileEntry));
   memcpy(newFile->Filename, entry.DIR_Name, 8);
   memcpy(newFile->Ext, entry.DIR_Ext, 3);
-
-  /*  memcpy(entry.DIR_Ext,name + strlen(name)-3,3);
-  memcpy(entry.DIR_Name,name,8);
-
-  format_name(entry.DIR_Ext,3);
-  format_name(entry.DIR_Name,8);
-*/
 
   //If this is a directory, add the directory bit
   if (isDirectory)
@@ -540,7 +541,7 @@ static void add_file(char *name, char *filepath, uint32_t size, u_char isDirecto
       new_dir->dirtables = 0;
       new_dir->current_dir_position = 0;
       new_dir->parent = current_dir;
-      new_dir->dir_location = current_fat_position;
+      new_dir->dir_location = filePosition;
       new_dir->files = 0;
       current_dir = new_dir;
 
@@ -553,8 +554,8 @@ static void add_file(char *name, char *filepath, uint32_t size, u_char isDirecto
       memset(&dotentry, 0, sizeof(DirEntry));
       dotentry.DIR_Attr = DIR_Attr_Archive | DIR_Attr_Directory;
       dotentry.DIR_Name[0] = '.';
-      dotentry.DIR_FstClusLO = (uint16_t)(current_fat_position & 0x00FF);
-      dotentry.DIR_FstClusHI = (uint16_t)(current_fat_position & 0xFF00) >> 16;
+      dotentry.DIR_FstClusLO = (uint16_t)(current_dir->dir_location & 0x00FF);
+      dotentry.DIR_FstClusHI = (uint16_t)(current_dir->dir_location & 0xFF00) >> 16;
       dir_add_entry((unsigned char *)&dotentry, 1);
 
       //..
