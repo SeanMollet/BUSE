@@ -28,6 +28,21 @@
 #include "utils.h"
 #include "address.h"
 
+//Create the root directory entry and set it as the current directory
+void build_root_dir()
+{
+  root_dir.path = "\\";
+  root_dir.current_dir_position = 0;
+  root_dir.dirtables = 0;
+  root_dir.files = 0;
+  //This makes sure we can never go above the root_dir
+  root_dir.parent = &root_dir;
+  root_dir.dir_location = root_dir_loc();
+
+  current_dir = &root_dir;
+  current_fat_position = root_dir_loc();
+}
+
 //Build and map the MBR. Note that we just use a fixed 2TB size
 void build_mbr(unsigned char *mbr)
 {

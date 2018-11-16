@@ -21,6 +21,7 @@
 
 #define Fat32_Sectors_per_Cluster 64
 
+void build_root_dir();
 void build_mbr(unsigned char *mbr);
 void build_boot_sector(BootEntry *bootentry, int xmpl_debug);
 static const uint32_t part1_base = 1048576;

@@ -35,13 +35,11 @@ static unsigned char *mbr;
 
 BootEntry bootentry;
 uint32_t *fat = 0;
-
-static uint32_t current_fat_position; // 0 and 1 are special and 2 is the root dir
-static unsigned char fat_end[] = {0xFF, 0xFF, 0xFF, 0xFF};
-
+uint32_t current_fat_position; // 0 and 1 are special and 2 is the root dir
 Fat_Directory root_dir;
 Fat_Directory *current_dir;
 
+static unsigned const char fat_end[] = {0xFF, 0xFF, 0xFF, 0xFF};
 static int xmpl_debug = 1;
 
 static int xmp_read(void *buf, uint32_t len, uint64_t offset,
@@ -230,21 +228,6 @@ static int xmp_trim(uint64_t from, uint32_t len, void *userdata)
   return 0;
 }
 
-//Create the root directory entry and set it as the current directory
-static void build_root_dir()
-{
-  root_dir.path = "\\";
-  root_dir.current_dir_position = 0;
-  root_dir.dirtables = 0;
-  root_dir.files = 0;
-  //This makes sure we can never go above the root_dir
-  root_dir.parent = &root_dir;
-  root_dir.dir_location = root_dir_loc();
-
-  current_dir = &root_dir;
-  current_fat_position = root_dir_loc();
-}
-
 //Advance the pointer to the next free sector in the fat
 static void fat_find_free()
 {
@@ -413,27 +396,6 @@ static int dir_add_entry(unsigned char *entry, uint32_t length)
   }
   //Profit!
   return 0;
-}
-
-//Long filename checksum of SFN
-//Thanks to itisravi, https://gist.github.com/itisravi/4440535 for this algorithm
-static unsigned char fn_checksum(unsigned char *filename, unsigned char *ext)
-{
-  uint8_t filename_len;
-  unsigned char sum;
-
-  sum = 0;
-  for (filename_len = 8; filename_len != 0; filename_len--)
-  {
-    // NOTE: The operation is an unsigned char rotate right
-    sum = ((sum & 1) ? 0x80 : 0) + (sum >> 1) + *filename++;
-  }
-  for (filename_len = 3; filename_len != 0; filename_len--)
-  {
-    // NOTE: The operation is an unsigned char rotate right
-    sum = ((sum & 1) ? 0x80 : 0) + (sum >> 1) + *ext++;
-  }
-  return (sum);
 }
 
 static void up_dir()

@@ -216,6 +216,29 @@ void format_name_83(Fat_Directory *current_dir, unsigned char *input, uint32_t l
   }
 }
 
+//Long filename checksum of SFN
+//Thanks to itisravi, https://gist.github.com/itisravi/4440535 for this algorithm
+//Long filename checksum of SFN
+//Thanks to itisravi, https://gist.github.com/itisravi/4440535 for this algorithm
+unsigned char fn_checksum(unsigned char *filename, unsigned char *ext)
+{
+  uint8_t filename_len;
+  unsigned char sum;
+
+  sum = 0;
+  for (filename_len = 8; filename_len != 0; filename_len--)
+  {
+    // NOTE: The operation is an unsigned char rotate right
+    sum = ((sum & 1) ? 0x80 : 0) + (sum >> 1) + *filename++;
+  }
+  for (filename_len = 3; filename_len != 0; filename_len--)
+  {
+    // NOTE: The operation is an unsigned char rotate right
+    sum = ((sum & 1) ? 0x80 : 0) + (sum >> 1) + *ext++;
+  }
+  return (sum);
+}
+
 //Output the contents of a boot struct
 void printBootSect(BootEntry *bootentry)
 {

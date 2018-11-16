@@ -7,4 +7,6 @@ int8_t file_exists(Fat_Directory *current_dir, uint8_t filename[8], uint8_t exte
 int updateSFN(uint8_t *filename, int *tildePos, int iterator);
 void format_name_83(Fat_Directory *current_dir, unsigned char *input, uint32_t length, unsigned char *filename,
                     unsigned char *ext, unsigned char *lfn, unsigned int *lfnlength);
+unsigned char fn_checksum(unsigned char *filename, unsigned char *ext);
+
 void printBootSect(struct BootEntry *bootentry);
