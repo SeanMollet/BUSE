@@ -43,7 +43,7 @@ Fat_Directory *current_dir;
 static unsigned char *mbr;
 
 //Debug flag
-static int xmpl_debug = 1;
+static int xmpl_debug = 0;
 
 //Function prototypes for API
 static int xmp_read(void *buf, uint32_t len, uint64_t offset,
@@ -301,6 +301,8 @@ int main(int argc, char *argv[])
   build_root_dir();
   //Populate the virtual disk with the contents of the given FS
   scan_folder(argv[2]);
-
+  
+  fprintf(stderr,"Scan complete, launching block device\n");
+  
   return buse_main(argv[1], &aop, (void *)&xmpl_debug);
 }
