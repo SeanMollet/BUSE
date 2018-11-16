@@ -8,7 +8,7 @@ a network drive.
 This FS is read-only, limited to 2TB of total size and 4GB maximum file sizes,
 as per the FAT32 specification.
 
-##Running
+## Running
 
 vsFat is ready to go out of the box. Download, compile with make and execute 
 the following as root:
@@ -24,7 +24,9 @@ given path. When complete, it will say:
 Once this is done, /dev/nbd0 will appear as a 2TB HDD, with a single 2TB 
 partition formatted FAT32 containing all the files inside /path/to/export
 
-##USB Host mode
+## USB Host mode
+
+Todo: Add instructions for using USB host mode
 
 ## Based on BUSE - A block device in userspace
 
