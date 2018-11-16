@@ -664,12 +664,12 @@ static void format_name_83(char *input, u_int32_t length, unsigned char *filenam
 static void up_dir()
 {
   //Free the current dir (we shouldn't be leaving until we're done with it)
-  //Commented out for debugging
-  // if (current_dir != &root_dir)
-  // {
-  //   free(current_dir->path);
-  //   free(current_dir);
-  // }
+  //Commented out for debugging - will need to be removed for tracking if writing is desired
+  if (current_dir != &root_dir)
+  {
+    free(current_dir->path);
+    free(current_dir);
+  }
 
   //If the parent is root, we just stay at the root
   current_dir = current_dir->parent;
