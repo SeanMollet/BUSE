@@ -288,16 +288,18 @@ int main(int argc, char *argv[])
     fprintf(stderr,
             "Usage:\n"
             "  %s /dev/nbd0 ./folder_to_export\n"
-            "Don't forget to load nbd kernel module (`modprobe nbd`) and\n"
-            "run example from root.\n",
+            "Don't forget to load the nbd kernel module (`modprobe nbd`) and\n"
+            "run as root.\n",
             argv[0]);
     return 1;
   }
 
+  //Setup the virtual disk
   build_mbr(mbr);
   build_boot_sector(&bootentry, xmpl_debug);
   build_fats();
   build_root_dir();
+  //Populate the virtual disk with the contents of the given FS
   scan_folder(argv[2]);
 
   return buse_main(argv[1], &aop, (void *)&xmpl_debug);
