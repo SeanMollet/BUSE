@@ -338,81 +338,87 @@ static int fat_new_file(unsigned char *data, char *filepath, uint32_t length)
 //This does accept multiple entries. However, it does not accept more than a single file worth
 static int dir_add_entry(unsigned char *entry, uint32_t length)
 {
-  uint32_t cluster_size = (bootentry.BPB_BytsPerSec * bootentry.BPB_SecPerClus);
-  uint32_t entrys_per_cluster = cluster_size / sizeof(DirEntry);
-  uint32_t current_cluster_free = current_dir->current_dir_position % entrys_per_cluster;
-
-  //Make sure we have an initial entry
-  if (current_dir->dirtables == 0)
+  while (length > 0)
   {
-    current_dir->dirtables = malloc(sizeof(DirTable));
-    current_dir->dirtables->next = 0;
+    uint32_t cluster_size = (bootentry.BPB_BytsPerSec * bootentry.BPB_SecPerClus);
+    uint32_t entrys_per_cluster = cluster_size / sizeof(DirEntry);
+    uint32_t current_cluster_free = current_dir->current_dir_position % entrys_per_cluster;
 
-    current_dir->dirtables->dirtable = malloc(cluster_size);
-    memset(current_dir->dirtables->dirtable, 0, cluster_size);
+    //Make sure we have an initial entry
+    if (current_dir->dirtables == 0)
+    {
+      current_dir->dirtables = malloc(sizeof(DirTable));
+      current_dir->dirtables->next = 0;
 
-    uint64_t dest = address_from_fatclus(current_dir->dir_location);
-    add_address_region(dest, cluster_size, current_dir->dirtables->dirtable, 0);
-    current_cluster_free = entrys_per_cluster;
+      current_dir->dirtables->dirtable = malloc(cluster_size);
+      memset(current_dir->dirtables->dirtable, 0, cluster_size);
 
-    memcpy(&fat[current_dir->dir_location], fat_end, sizeof(fat_end)); // Terminate this chain in the FAT
-  }
+      uint64_t dest = address_from_fatclus(current_dir->dir_location);
+      add_address_region(dest, cluster_size, current_dir->dirtables->dirtable, 0);
+      current_cluster_free = entrys_per_cluster;
 
-  //We don't let re-alloc do this, because we need to grab cluster 2 for the first one
-  //We also override the current_cluster_free because the 0 breaks it
-  //Make sure the DIR exists
-  if (current_dir->dirtables->dirtable == 0)
-  {
-  }
+      memcpy(&fat[current_dir->dir_location], fat_end, sizeof(fat_end)); // Terminate this chain in the FAT
+    }
 
-  //Make sure we don't exceed the 2Mb limit for directory size
-  if (current_dir->current_dir_position + length > (1024 * 1024 * 2) / sizeof(DirEntry))
-  {
-    return -1;
-  }
+    //We don't let re-alloc do this, because we need to grab cluster 2 for the first one
+    //We also override the current_cluster_free because the 0 breaks it
+    //Make sure the DIR exists
+    if (current_dir->dirtables->dirtable == 0)
+    {
+    }
 
-  //Add another cluster if needed
-  if (current_cluster_free < length)
-  {
-    fat_find_free();
+    //Make sure we don't exceed the 2Mb limit for directory size
+    if (current_dir->current_dir_position + 1 > (1024 * 1024 * 2) / sizeof(DirEntry))
+    {
+      return -1;
+    }
 
-    uint32_t used_clusters = ceil_div(current_dir->current_dir_position, entrys_per_cluster);
+    //Add another cluster if needed
+    if (current_cluster_free < 1)
+    {
+      fat_find_free();
 
-    //Add a new entry to the dirtables linked list
-    //Find the end of the list
+      uint32_t used_clusters = ceil_div(current_dir->current_dir_position, entrys_per_cluster);
+
+      //Add a new entry to the dirtables linked list
+      //Find the end of the list
+      DirTable *final_dir_table = current_dir->dirtables;
+      while (final_dir_table->next != 0)
+      {
+        final_dir_table = final_dir_table->next;
+      }
+
+      final_dir_table->next = malloc(sizeof(DirTable));
+      final_dir_table = final_dir_table->next;
+
+      final_dir_table->dirtable = malloc(cluster_size);
+      memset(final_dir_table->dirtable, 0, cluster_size);
+      final_dir_table->next = 0;
+      add_address_region(address_from_fatclus(current_fat_position), cluster_size, final_dir_table->dirtable, 0);
+
+      //Update the fat for the previous link in the chain to point to the new one
+      fat[current_dir->dir_location] = current_fat_position;
+      //Advance this pointer to the extended fat sector
+      current_dir->dir_location = current_fat_position;
+      memcpy(&fat[current_dir->dir_location], fat_end, sizeof(fat_end)); // Terminate this chain in the FAT
+    }
+
+    //Find the last dir_table in this chain and the last unused position
     DirTable *final_dir_table = current_dir->dirtables;
+    uint32_t final_table_pos = current_dir->current_dir_position;
     while (final_dir_table->next != 0)
     {
       final_dir_table = final_dir_table->next;
+      final_table_pos -= entrys_per_cluster;
     }
 
-    final_dir_table->next = malloc(sizeof(DirTable));
-    final_dir_table = final_dir_table->next;
-
-    final_dir_table->dirtable = malloc(cluster_size);
-    memset(final_dir_table->dirtable, 0, cluster_size);
-    final_dir_table->next = 0;
-    add_address_region(address_from_fatclus(current_fat_position), cluster_size, final_dir_table->dirtable, 0);
-
-    //Update the fat for the previous link in the chain to point to the new one
-    fat[current_dir->dir_location] = current_fat_position;
-    //Advance this pointer to the extended fat sector
-    current_dir->dir_location = current_fat_position;
-    memcpy(&fat[current_dir->dir_location], fat_end, sizeof(fat_end)); // Terminate this chain in the FAT
+    //copy the data in
+    memcpy(final_dir_table->dirtable + final_table_pos * sizeof(DirEntry), entry, sizeof(DirEntry));
+    current_dir->current_dir_position++;
+    //Move to the next one
+    length--;
+    entry += sizeof(DirEntry);
   }
-
-  //Find the last dir_table in this chain and the last unused position
-  DirTable *final_dir_table = current_dir->dirtables;
-  uint32_t final_table_pos = current_dir->current_dir_position;
-  while (final_dir_table->next != 0)
-  {
-    final_dir_table = final_dir_table->next;
-    final_table_pos -= entrys_per_cluster;
-  }
-
-  //copy the data in
-  memcpy(final_dir_table->dirtable + final_table_pos * sizeof(DirEntry), entry, length * sizeof(DirEntry));
-  current_dir->current_dir_position += length;
   //Profit!
   return 0;
 }
