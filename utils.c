@@ -28,7 +28,7 @@
 //Compare two arrays up to "length" bytes for equality
 int8_t arrays_equal(uint8_t *left, uint8_t *right, int8_t length)
 {
-        for (; length > 0; length--)
+        for (length--; length >= 0; length--)
         {
                 if (left[length] != right[length])
                 {
@@ -45,7 +45,7 @@ uint32_t ceil_div(uint32_t x, uint32_t y)
 }
 
 //Check if a file exists in the given directory
-int8_t file_exists(Fat_Directory *current_dir, uint8_t filename[8], uint8_t extension[3])
+int8_t file_exists(Fat_Directory *current_dir, uint8_t *filename, uint8_t *extension)
 {
         FileEntry *testFile = current_dir->files;
         while (testFile != 0)
@@ -97,6 +97,8 @@ int updateSFN(uint8_t *filename, int *tildePos, int iterator)
 void format_name_83(Fat_Directory *current_dir, unsigned char *input, uint32_t length, unsigned char *filename,
                     unsigned char *ext, unsigned char *lfn, unsigned int *lfnlength)
 {
+        unsigned char *adjusted = malloc(length);
+
         //If none of the lfn_required things exist in this filename, we don't build one
         int8_t lfn_required = 0;
         int32_t period = -1;
@@ -106,20 +108,21 @@ void format_name_83(Fat_Directory *current_dir, unsigned char *input, uint32_t l
         //First we take out things we know don't belong
         for (int a = 0; a < (int32_t)length; a++)
         {
+                adjusted[a] = input[a];
                 if (input[a] == 0x20)
-                {                        // Space
-                        input[a] = 0x5F; // _
+                {                           // Space
+                        adjusted[a] = 0x5F; // _
                         lfn_required = 1;
                 }
                 if (input[a] == 0xe5)
                 {
-                        input[a] = 0x05;
+                        adjusted[a] = 0x05;
                         lfn_required = 1;
                 }
                 unsigned char test = toupper(input[a]); //This does nothing if there isn't an upper case form
                 if (test != input[a])
                 {
-                        input[a] = test;
+                        adjusted[a] = test;
                         lfn_required = 1;
                 }
                 //Check if this is a period
@@ -132,7 +135,7 @@ void format_name_83(Fat_Directory *current_dir, unsigned char *input, uint32_t l
         //Finally, check if the length exceeds the allowed amount
         if (length > 11                   //Overall length is too long
             || (length > 8 && period < 0) //Length is too long without an extension
-            || (length - period) > 3      //The extension is longer than 3 characters
+            || (length - period) > 4      //The extension is longer than 3 characters
         )
         {
                 lfn_required = 1;
@@ -149,7 +152,7 @@ void format_name_83(Fat_Directory *current_dir, unsigned char *input, uint32_t l
                 //Note: the +1 is needed because period= the actual period, not the extension
                 if (period + a + 1 < (int32_t)length)
                 {
-                        ext[a] = input[period + a + 1];
+                        ext[a] = adjusted[period + a + 1];
                 }
                 else
                 {
@@ -161,7 +164,7 @@ void format_name_83(Fat_Directory *current_dir, unsigned char *input, uint32_t l
         {
                 if (a < period)
                 {
-                        filename[a] = input[a];
+                        filename[a] = adjusted[a];
                 }
                 else
                 {
