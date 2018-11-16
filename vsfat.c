@@ -36,7 +36,7 @@ static unsigned char *mbr;
 BootEntry bootentry;
 
 static uint32_t *fat = 0;
-static uint32_t current_fat_position = 3; // 0 and 1 are special and 2 is the root dir
+static uint32_t current_fat_position; // 0 and 1 are special and 2 is the root dir
 static unsigned char fat_end[] = {0xFF, 0xFF, 0xFF, 0xFF};
 
 Fat_Directory root_dir;
@@ -234,8 +234,7 @@ static int xmp_trim(uint64_t from, uint32_t len, void *userdata)
 static void build_fats()
 {
   //These first two entries are part of the spec
-  //The third marks our root directly
-  unsigned char fatspecial[] = {0xF8, 0xFF, 0xFF, 0x0F, 0xFF, 0xFF, 0xFF, 0x0F, 0xF8, 0xFF, 0xFF, 0x0F};
+  unsigned char fatspecial[] = {0xF8, 0xFF, 0xFF, 0x0F, 0xFF, 0xFF, 0xFF, 0x0F};
 
   fat = malloc(bootentry.BPB_FATSz32 * bootentry.BPB_BytsPerSec);
   memset(fat, 0, bootentry.BPB_FATSz32 * bootentry.BPB_BytsPerSec);
@@ -270,6 +269,7 @@ static void build_root_dir()
   root_dir.dir_location = root_dir_loc();
 
   current_dir = &root_dir;
+  current_fat_position = root_dir_loc();
 }
 
 //Advance the pointer to the next free sector in the fat
@@ -290,10 +290,8 @@ static void fat_find_free()
 //This will load the proper mappings and configure the fat
 //Directory entries should be handled above here
 //This assumes we have 0 fragmentation (which should always be true, since we don't allow deleting)
-static int fat_new_file(unsigned char *data, char *filepath, uint32_t length)
+static int fat_new_file(uint32_t file_fat_position, unsigned char *data, char *filepath, uint32_t length)
 {
-  //Get a free cluster
-  fat_find_free();
   //length always has to be at least 1
   if (length <= 0)
   {
@@ -304,11 +302,11 @@ static int fat_new_file(unsigned char *data, char *filepath, uint32_t length)
   uint32_t cluster_size = (bootentry.BPB_BytsPerSec * bootentry.BPB_SecPerClus);
   uint32_t clusters_required = ceil_div(length, cluster_size); //Ceiling division
   if (clusters_required >
-      ((bootentry.BPB_FATSz32 * bootentry.BPB_BytsPerSec) / 4) - current_fat_position)
+      ((bootentry.BPB_FATSz32 * bootentry.BPB_BytsPerSec) / 4) - file_fat_position)
   { //Free clusters
     return -1;
   }
-  add_address_region(address_from_fatclus(current_fat_position), length, data, filepath);
+  add_address_region(address_from_fatclus(file_fat_position), length, data, filepath);
 
   //Remove the space for our first cluster
   if (length > cluster_size)
@@ -323,8 +321,8 @@ static int fat_new_file(unsigned char *data, char *filepath, uint32_t length)
   //Mark any additional sectors in the FAT that we're using
   while (length > 0)
   {
-    fat[current_fat_position] = current_fat_position + 1;
-    current_fat_position++;
+    fat[file_fat_position] = file_fat_position + 1;
+    file_fat_position++;
     //Unsigned, so the subtraction could loop us around
     if (length > cluster_size)
     {
@@ -336,8 +334,20 @@ static int fat_new_file(unsigned char *data, char *filepath, uint32_t length)
     }
   }
 
-  memcpy(&fat[current_fat_position], fat_end, sizeof(fat_end)); // Terminate this chain
+  memcpy(&fat[file_fat_position], fat_end, sizeof(fat_end)); // Terminate this chain
   return 0;
+}
+
+//Check if the current directory entry has space available
+static int dir_entry_free()
+{
+  if (current_dir->dirtables == 0)
+  {
+    return 0;
+  }
+  uint32_t cluster_size = (bootentry.BPB_BytsPerSec * bootentry.BPB_SecPerClus);
+  uint32_t entrys_per_cluster = cluster_size / sizeof(DirEntry);
+  return current_dir->current_dir_position % entrys_per_cluster;
 }
 
 //This does accept multiple entries. However, it does not accept more than a single file worth
@@ -363,13 +373,6 @@ static int dir_add_entry(unsigned char *entry, uint32_t length)
       current_cluster_free = entrys_per_cluster;
 
       memcpy(&fat[current_dir->dir_location], fat_end, sizeof(fat_end)); // Terminate this chain in the FAT
-    }
-
-    //We don't let re-alloc do this, because we need to grab cluster 2 for the first one
-    //We also override the current_cluster_free because the 0 breaks it
-    //Make sure the DIR exists
-    if (current_dir->dirtables->dirtable == 0)
-    {
     }
 
     //Make sure we don't exceed the 2Mb limit for directory size
@@ -506,8 +509,17 @@ static void add_file(char *name, char *filepath, uint32_t size, u_char isDirecto
 
   fat_find_free();
 
-  entry.DIR_FstClusLO = (uint16_t)(current_fat_position & 0xFFFF);
-  entry.DIR_FstClusHI = (uint16_t)((current_fat_position & 0xFFFF0000) >> 16);
+  //If the directory entry for this file will require a cluster
+  //Then our file will end up in the next cluster after that
+  //So, we need to increment this now to generate the correct entry
+  uint32_t filePosition = current_fat_position;
+  if (dir_entry_free() == 0)
+  {
+    filePosition++;
+  }
+
+  entry.DIR_FstClusLO = (uint16_t)(filePosition & 0xFFFF);
+  entry.DIR_FstClusHI = (uint16_t)((filePosition & 0xFFFF0000) >> 16);
   entry.DIR_FileSize = size;
 
   //dir_add_entry wants a byte array so it can have multiple entries chained together
@@ -518,7 +530,7 @@ static void add_file(char *name, char *filepath, uint32_t size, u_char isDirecto
     if (!isDirectory)
     {
       //Allocate the array for the actual data
-      fat_new_file(0, filepath, size);
+      fat_new_file(filePosition, 0, filepath, size);
     }
     else
     {
