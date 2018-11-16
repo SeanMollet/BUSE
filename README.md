@@ -16,6 +16,13 @@ the following :
     sudo modprobe nbd
     sudo ./vsfat /dev/nbd0 /path/to/export &
     
+To automatically load nbd at boot, execute the following:
+
+    echo "dwc2" | sudo tee -a /etc/modules
+    
+Then, vsfat can be launched automatically from rc.local or systemd, followed by the
+usb device module.
+    
 It will process for a few seconds while it catalogs all of the files under the
 given path. When complete, it will say:
 
