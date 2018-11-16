@@ -399,8 +399,6 @@ static int dir_add_entry(unsigned char *entry, uint32_t length)
     {
       fat_find_free();
 
-      uint32_t used_clusters = ceil_div(current_dir->current_dir_position, entrys_per_cluster);
-
       //Add a new entry to the dirtables linked list
       //Find the end of the list
       DirTable *final_dir_table = current_dir->dirtables;
@@ -530,7 +528,6 @@ static void add_file(char *name, char *filepath, uint32_t size, u_char isDirecto
     LfnEntry *lfnEntries = malloc(sizeof(LfnEntry) * lfnEntryCount);
     memset(lfnEntries, 0xFF, sizeof(LfnEntry) * lfnEntryCount);
 
-    int entryCount = 0;
     for (int entryCount = 0; entryCount < lfnEntryCount; entryCount++)
     {
       int currentEntry = lfnEntryCount - entryCount - 1;

@@ -136,6 +136,17 @@ typedef struct LDirEntry
     unsigned char LDIR_Name3[4]; //Char 12-13
 } LDirEntry;
 
+typedef struct FSInfo
+{
+    uint32_t FSI_LeadSig;
+    uint8_t FSI_Reserved1[480];
+    uint32_t FSI_StrucSig;
+    uint32_t FSI_Free_Count;
+    uint32_t FSI_Nxt_Free;
+    uint8_t FSI_Reserved2[12];
+    uint32_t FSI_TrailSig;
+} FSInfo;
+
 #pragma pack(pop)
 
 //Global variables
