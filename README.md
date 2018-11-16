@@ -30,7 +30,7 @@ Thanks to By Andrew Mulholland (gbaman) and his Gist at
 https://gist.github.com/gbaman/50b6cca61dd1c3f88f41 for clean, consise instructions 
 on setting this up. Pertinent sections reproduced here.  
 
-###2. Modular, but slower to setup method
+### 2. Modular, but slower to setup method
  
     
 1. First, flash Jessie (only tested on full, lite version may also work though) onto a blank microSD card.  
