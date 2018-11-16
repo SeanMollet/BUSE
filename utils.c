@@ -44,6 +44,163 @@ uint32_t ceil_div(uint32_t x, uint32_t y)
         return (x % y) ? x / y + 1 : x / y; //Ceiling division
 }
 
+//Check if a file exists in the given directory
+int8_t file_exists(Fat_Directory *current_dir, uint8_t filename[8], uint8_t extension[3])
+{
+        FileEntry *testFile = current_dir->files;
+        while (testFile != 0)
+        {
+                if (arrays_equal(testFile->Filename, filename, 8) && arrays_equal(testFile->Ext, extension, 3))
+                {
+                        return 1;
+                }
+                testFile = testFile->next;
+        }
+
+        return 0;
+}
+
+//Add the ~ and the number (given in iterator) to the given filename
+int updateSFN(uint8_t *filename, int *tildePos, int iterator)
+{
+        //First time with a two digit iterator, so we move the tilde
+        if (iterator == 10)
+        {
+                //If the tildePos is lower than this, there's no need to move it
+                if (*tildePos > 5)
+                {
+                        (*tildePos)--;
+                }
+        }
+        filename[*tildePos] = '~';
+        if (iterator > 10)
+        {
+                int tensPlace = iterator / 10;
+                filename[*tildePos + 1] = tensPlace + 48; //Convert int to ascii number
+                int onesPlace = iterator % 10;
+                filename[*tildePos + 2] = onesPlace + 48; //Convert into to ascii number
+
+                if (iterator > 99)
+                {
+                        fprintf(stderr, "Too many file collisions for %s\n", filename);
+                        return -1;
+                }
+        }
+        else
+        {
+                filename[*tildePos + 1] = iterator + 48;
+        }
+        return 0;
+}
+
+//Convert filename to FAT32 8.3 format and generate an lfn string in proper format
+void format_name_83(Fat_Directory *current_dir, unsigned char *input, uint32_t length, unsigned char *filename,
+                    unsigned char *ext, unsigned char *lfn, unsigned int *lfnlength)
+{
+        //If none of the lfn_required things exist in this filename, we don't build one
+        int8_t lfn_required = 0;
+        int32_t period = -1;
+
+        *lfnlength = 0;
+
+        //First we take out things we know don't belong
+        for (int a = 0; a < (int32_t)length; a++)
+        {
+                if (input[a] == 0x20)
+                {                        // Space
+                        input[a] = 0x5F; // _
+                        lfn_required = 1;
+                }
+                if (input[a] == 0xe5)
+                {
+                        input[a] = 0x05;
+                        lfn_required = 1;
+                }
+                unsigned char test = toupper(input[a]); //This does nothing if there isn't an upper case form
+                if (test != input[a])
+                {
+                        input[a] = test;
+                        lfn_required = 1;
+                }
+                //Check if this is a period
+                if (input[a] == 46)
+                {
+                        period = a;
+                }
+        }
+
+        //Finally, check if the length exceeds the allowed amount
+        if (length > 11                   //Overall length is too long
+            || (length > 8 && period < 0) //Length is too long without an extension
+            || (length - period) > 3      //The extension is longer than 3 characters
+        )
+        {
+                lfn_required = 1;
+        }
+
+        //If we didn't get a period, just run to the length
+        if (period < 0)
+        {
+                period = length;
+        }
+
+        for (int a = 0; a < 3; a++)
+        {
+                //Note: the +1 is needed because period= the actual period, not the extension
+                if (period + a + 1 < (int32_t)length)
+                {
+                        ext[a] = input[period + a + 1];
+                }
+                else
+                {
+                        ext[a] = 0x20;
+                }
+        }
+
+        for (int a = 0; a < 8; a++)
+        {
+                if (a < period)
+                {
+                        filename[a] = input[a];
+                }
+                else
+                {
+                        filename[a] = 0x20;
+                }
+        }
+
+        if (lfn_required)
+        {
+                int iterator = 1; //Ascii 1
+                int tildePos = 6;
+                //If we have a file that requires LFN, but is shorter than 8
+                if (period == 7)
+                {
+                        tildePos = 6;
+                }
+                if (period < 7)
+                {
+                        tildePos = period;
+                }
+
+                //Test until we find a usable name
+                do
+                {
+                        updateSFN(filename, &tildePos, iterator);
+                        iterator++;
+                } while (file_exists(current_dir, filename, ext));
+
+                //We have a usable name, so now we copy the given name into the lfn field, padding with 0x00 to fake UCS-2.
+                //TODO: Properly support UTF-16/UCS-2
+                for (uint8_t i = 0; i < length; i++)
+                {
+                        lfn[(i * 2)] = input[i];
+                        lfn[(i * 2) + 1] = 0x00;
+                        lfnlength++;
+                }
+        }
+}
+
 //Output the contents of a boot struct
 void printBootSect(BootEntry *bootentry)
 {
