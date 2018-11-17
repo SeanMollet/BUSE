@@ -41,12 +41,12 @@ Ideally, adjust the size only with the Sectors_per_Cluster.
 The following are possible values and the resulting disk size:
 
     SecPerClus	Disk Size (G)	Fat Size (Mb)
-    1	        0.5	            4
-    2       	2	            8
-    4	        8	            16
-    8	        32	            32
-    16	        128	            64
-    32	        512	            128
+    1	        0.5	           4
+    2       	2	           8
+    4	        8	           16
+    8	        32	           32
+    16	        128	           64
+    32	        512	           128
     64	        2048	        256
 
 If this isn't fine grain enough for your application, you can also adjust the FAT_Table_Length, which will also adjust the final size proportionally to the adjustment made. Reducing this value by 50% will shrink the disk to 50% of the above size.
