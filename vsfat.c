@@ -16,6 +16,7 @@
  *  with this program; if not, write to the Free Software Foundation, Inc.,
  *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
+#define _FILE_OFFSET_BITS 64
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -251,7 +252,11 @@ static void scan_folder(char *path)
 
         sprintf(f_path, "%s/%s", path, dir->d_name);
         stat(f_path, &st);
+#if defined(ENV64BIT)
         printf("%s/%s  %ld\n", path, dir->d_name, st.st_size);
+#else
+        printf("%s/%s  %lld\n", path, dir->d_name, st.st_size);
+#endif
         add_file(dir->d_name, f_path, st.st_size, 0);
       }
       else
