@@ -41,6 +41,11 @@ Fat_Directory root_dir;
 Fat_Directory *current_dir;
 unsigned char *mbr;
 
+//Local file caching variables
+char *cachedFilePath = 0;
+FILE *cachedFile = 0;
+uint32_t cachedRegion = 0;
+
 //Debug flag
 static int xmpl_debug = 0;
 
@@ -81,6 +86,16 @@ static int xmp_read(void *buf, uint32_t len, uint64_t offset, void *userdata)
   //No point doing this if we've already used up len
   for (uint32_t a = 0; a < address_regions_count && len > 0; a++)
   {
+    //Check if this read is within our cache
+    if (cachedRegion != 0)
+    {
+      //We only cache if the entire request is within the cached region
+      if (offset > address_regions[cachedRegion].base &&
+          offset + len <= address_regions[a].base + address_regions[a].length)
+      {
+        a = cachedRegion;
+      }
+    }
     if ((offset >= address_regions[a].base && // See if the beginning is inside our range
          offset <= address_regions[a].base + address_regions[a].length) ||
         (offset + len >= address_regions[a].base && // See if the end is (we'll also accept both)
@@ -150,13 +165,30 @@ static int xmp_read(void *buf, uint32_t len, uint64_t offset, void *userdata)
       {
         if (address_regions[a].file_path)
         {
-          FILE *fd = fopen(address_regions[a].file_path, "rb");
+          FILE *fd;
+          //Check our cached file descriptor first
+          //Note that this is comparing the pointers, not the strings
+          if (cachedFilePath == address_regions[a].file_path)
+          {
+            fd = cachedFile;
+          }
+          else
+          {
+            //If it's not, close the cached file
+            if (cachedFile != 0)
+            {
+              fclose(cachedFile);
+              cachedFile = 0;
+            }
+            fd = fopen(address_regions[a].file_path, "rb");
+            cachedFile = fd;
+            cachedFilePath = address_regions[a].file_path;
+          }
           if (fd)
           {
 
             fseek(fd, usepos, SEEK_SET);
             size_t read_count = fread((unsigned char *)buf + usetarget, uselen, 1, fd);
-            fclose(fd);
             if (*(int *)userdata)
             {
 #if defined(ENV64BIT)
