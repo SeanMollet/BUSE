@@ -19,7 +19,23 @@
 
 #include "vsfat.h"
 
-#define Fat32_Sectors_per_Cluster 1
+//These two settings adjust the size of the syn-disk
+// SecPerClus	Disk Size (G)
+// 1		0.5
+// 2		2
+// 4		8
+// 8		32
+// 16		128
+// 32		512
+// 64		2048
+
+#define Fat32_Sectors_per_Cluster 32
+
+//8192 = 2Tb with 64 Sec/Clus
+//Subtract 3 for the reserved area and space taken by fats
+//Practical maximum is 8189
+
+#define FAT32_FAT_Table_Length 8189
 
 void build_root_dir();
 void build_mbr();
