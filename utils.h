@@ -10,8 +10,4 @@ void format_name_83(Fat_Directory *current_dir, unsigned char *input, uint32_t l
 unsigned char fn_checksum(unsigned char *filename, unsigned char *ext);
 
 void printBootSect(struct BootEntry *bootentry);
-#define UNUSED(expr)  \
-    do                \
-    {                 \
-        (void)(expr); \
-    } while (0)
+#define UNUSED(expr) (void)(expr);
