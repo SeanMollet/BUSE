@@ -27,6 +27,7 @@
 #include "setup.h"
 #include "utils.h"
 #include "address.h"
+#include "vsfat.h"
 
 //Create the root directory entry and set it as the current directory
 void build_root_dir()
@@ -44,7 +45,7 @@ void build_root_dir()
 }
 
 //Build and map the MBR. Note that we just use a fixed 2TB size
-void build_mbr(unsigned char *mbr)
+void build_mbr()
 {
   unsigned char bootcode[] =
       {0xFA, 0xB8, 0x00, 0x10, 0x8E, 0xD0, 0xBC, 0x00, 0xB0, 0xB8, 0x00, 0x00,
@@ -79,14 +80,15 @@ void build_mbr(unsigned char *mbr)
 }
 
 //Build and map the bootsector(s)
-void build_boot_sector(BootEntry *bootentry, int xmpl_debug)
+//Returns the total disk size
+uint32_t build_boot_sector(BootEntry *bootentry, int xmpl_debug)
 {
 
   //Build our bootsector
   bootentry->BS_jmpBoot[0] = 0xeb;
   bootentry->BS_jmpBoot[1] = 0x58;
   bootentry->BS_jmpBoot[2] = 0x90;
-  strncpy((char *)&bootentry->BS_OEMName, "MSDOS5.0", 8);
+  strncpy((char *)&bootentry->BS_OEMName, "VSFAT1.0", 8);
   //
   bootentry->BPB_BytsPerSec = 512;
   //Eventually this will need to be turned up to get full capacity
@@ -100,8 +102,18 @@ void build_boot_sector(BootEntry *bootentry, int xmpl_debug)
   bootentry->BPB_SecPerTrk = 32;
   bootentry->BPB_NumHeads = 64;
   bootentry->BPB_HiddSec = 0;
-  bootentry->BPB_TotSec32 = 102400;
-  bootentry->BPB_FATSz32 = 788;
+  //8192 = 2Tb with 64 Sec/Clus
+  //Subtract 3 for the reserved area and space taken by fats
+  //Practical maximum is 8189
+  bootentry->BPB_FATSz32 = 8189;
+  //This is calculated based on the maximum available with the given FATSize
+  uint32_t datasize = bootentry->BPB_FATSz32 *
+                      bootentry->BPB_SecPerClus * (bootentry->BPB_BytsPerSec / 4);
+  //BPB_RsvdSecCnt includes the boot sector and the FSInfo sector
+  //Drivers expect the FATS to start at BPB_RsvdSecCnt*BPB_BytsPerSec
+  uint32_t headersize = bootentry->BPB_RsvdSecCnt +
+                        (bootentry->BPB_FATSz32 * bootentry->BPB_SecPerClus);
+  bootentry->BPB_TotSec32 = datasize + headersize;
   bootentry->BPB_ExtFlags = 0;
   bootentry->BPB_FSVer = 0;
   bootentry->BPB_RootClus = 2;
@@ -112,6 +124,18 @@ void build_boot_sector(BootEntry *bootentry, int xmpl_debug)
   bootentry->BS_BootSig = 29;
   bootentry->BS_VolID = 0x8456f237;
   bootentry->BS_BootSign = 0xAA55;
+
+  //Update the partition table with our actual size
+  //Get the start of the partition
+  uint32_t PartStart = 0;
+  memcpy(&PartStart, mbr + 454, 4);
+
+  uint32_t PartSize = bootentry->BPB_TotSec32;
+  memcpy(mbr + 458, &PartSize, 4);
+
+  //Since we only have a single partition and the MBR, etc are before start
+  //This gives us the total sectors
+  uint32_t DiskSize = PartSize + PartStart;
 
   unsigned char vol[] =
       {0x56, 0x53, 0x46, 0x41, 0x54, 0x46, 0x53, 0x20, 0x20, 0x20, 0x20};
@@ -148,6 +172,7 @@ void build_boot_sector(BootEntry *bootentry, int xmpl_debug)
                          bootentry->BPB_FSInfo * bootentry->BPB_BytsPerSec,
                      512,
                      fsi, 0);
+  return DiskSize;
 }
 
 //Do the initial FAT setup and mapping

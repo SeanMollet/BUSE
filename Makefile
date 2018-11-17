@@ -1,4 +1,4 @@
-TARGET		:= busexmp loopback vsfat
+TARGET		:= busexmp loopback vsfat bs_print
 LIBOBJS 	:= buse.o utils.o setup.o address.o fatfiles.o
 OBJS		:= $(TARGET:=.o) $(LIBOBJS)
 STATIC_LIB	:= libbuse.a

@@ -19,10 +19,10 @@
 
 #include "vsfat.h"
 
-#define Fat32_Sectors_per_Cluster 64
+#define Fat32_Sectors_per_Cluster 1
 
 void build_root_dir();
-void build_mbr(unsigned char *mbr);
-void build_boot_sector(BootEntry *bootentry, int xmpl_debug);
+void build_mbr();
+uint32_t build_boot_sector(BootEntry *bootentry, int xmpl_debug);
 static const uint32_t part1_base = 1048576;
 void build_fats();

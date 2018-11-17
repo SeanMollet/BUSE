@@ -38,9 +38,7 @@ uint32_t *fat = 0;
 uint32_t current_fat_position; // 0 and 1 are special and 2 is the root dir
 Fat_Directory root_dir;
 Fat_Directory *current_dir;
-
-//Local variables
-static unsigned char *mbr;
+unsigned char *mbr;
 
 //Debug flag
 static int xmpl_debug = 0;
@@ -304,8 +302,11 @@ int main(int argc, char *argv[])
   }
 
   //Setup the virtual disk
-  build_mbr(mbr);
-  build_boot_sector(&bootentry, xmpl_debug);
+  build_mbr();
+  //Update the disksize based on the boot sector configuration
+  uint32_t DiskSize = build_boot_sector(&bootentry, xmpl_debug);
+  aop.size_blocks = DiskSize;
+
   build_fats();
   build_root_dir();
   //Populate the virtual disk with the contents of the given FS

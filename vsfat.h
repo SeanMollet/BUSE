@@ -156,4 +156,5 @@ extern uint32_t *fat;
 extern uint32_t current_fat_position; // 0 and 1 are special and 2 is the root dir
 extern Fat_Directory root_dir;
 extern Fat_Directory *current_dir;
+extern unsigned char *mbr;
 #endif /* VSFAT_H_INCLUDED */
