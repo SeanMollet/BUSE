@@ -295,9 +295,12 @@ int main(int argc, char *argv[])
   }
 
   //Check the debug flag
-  if (strcmp(argv[3], "--debug") == 0)
+  if (argc > 3)
   {
-    xmpl_debug = 1;
+    if (strcmp(argv[3], "--debug") == 0)
+    {
+      xmpl_debug = 1;
+    }
   }
 
   //Setup the virtual disk
