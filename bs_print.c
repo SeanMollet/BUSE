@@ -33,6 +33,7 @@ int main(int argc, char *argv[])
         {
             fseek(fd, 0x100000, SEEK_SET);
             size_t read_count = fread((unsigned char *)&entry, 512, 1, fd);
+            UNUSED(read_count);
             fclose(fd);
             printBootSect(&entry);
         }
