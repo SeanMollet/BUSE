@@ -253,7 +253,7 @@ static void scan_folder(char *path)
 
         sprintf(f_path, "%s/%s", path, dir->d_name);
         stat(f_path, &st);
-        printf("%s/%s  %lu\n", path, dir->d_name, st.st_size);
+        printf("%s/%s  %ld\n", path, dir->d_name, st.st_size);
         add_file(dir->d_name, f_path, st.st_size, 0);
       }
       else
@@ -287,11 +287,17 @@ int main(int argc, char *argv[])
   {
     fprintf(stderr,
             "Usage:\n"
-            "  %s /dev/nbd0 ./folder_to_export\n"
+            "  %s /dev/nbd0 ./folder_to_export [--debug]\n"
             "Don't forget to load the nbd kernel module (`modprobe nbd`) and\n"
-            "run as root.\n",
+            "run as root. Adding --debug will turn on debugging\n",
             argv[0]);
     return 1;
+  }
+
+  //Check the debug flag
+  if (strcmp(argv[3], "--debug") == 0)
+  {
+    xmpl_debug = 1;
   }
 
   //Setup the virtual disk
@@ -301,8 +307,8 @@ int main(int argc, char *argv[])
   build_root_dir();
   //Populate the virtual disk with the contents of the given FS
   scan_folder(argv[2]);
-  
-  fprintf(stderr,"Scan complete, launching block device\n");
-  
+
+  fprintf(stderr, "Scan complete, launching block device\n");
+
   return buse_main(argv[1], &aop, (void *)&xmpl_debug);
 }
