@@ -272,7 +272,7 @@ void printBootSect(BootEntry *bootentry)
   fprintf(stderr, "BPB_RootClus=%u\n", bootentry->BPB_RootClus);
   fprintf(stderr, "BPB_FSInfo=%u\n", bootentry->BPB_FSInfo);
   fprintf(stderr, "BPB_BkBootSec=%u\n", bootentry->BPB_BkBootSec);
-  fprintf(stderr, "BPB_Reserved[12] %02x\n", bootentry->BPB_Reserved[12]);
+  fprintf(stderr, "BPB_Reserved[12] %02x\n", bootentry->BPB_Reserved);
   fprintf(stderr, "BS_DrvNum=%u\n", bootentry->BS_DrvNum);
   fprintf(stderr, "BS_Reserved1=%02x\n", bootentry->BS_Reserved1);
   fprintf(stderr, "BS_BootSig=%02x\n", bootentry->BS_BootSig);
