@@ -70,7 +70,7 @@ on setting this up. Pertinent sections reproduced here.
     
 ### Using the modules
 
-- **g_mass_storage** - To have your Pi Zero appear as a mass storage device (flash drive), connected to the nbd0 device for example ```sudo modprobe g_mass_storage  file=/dev/nbd0 stall=0```.
+- **g_mass_storage** - To have your Pi Zero appear as a mass storage device (flash drive), connected to the nbd0 device for example ```sudo modprobe g_mass_storage  file=/dev/nbd0 stall=0 iSerialNumber=1 removable=1 nofua=1 ro=1```.
 
 In theory, most USB devices should work alongside these kernels, to switch to USB OTG mode, simply don't use an OTG adapter cable and use a standard USB cable to plug your Pi Zero into another computer, it should auto switch.   
 
