@@ -19,7 +19,7 @@ $(TARGET:=.o): %.o: %.c buse.h setup.h
 $(STATIC_LIB): $(LIBOBJS) setup.h
 	ar rc $(STATIC_LIB) $(LIBOBJS)
 
-$(LIBOBJS): %.o: %.c
+$(LIBOBJS): %.o: %.c setup.h
 	$(CC) $(CFLAGS) -o $@ -c $<
 
 clean:
