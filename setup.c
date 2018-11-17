@@ -102,10 +102,7 @@ uint32_t build_boot_sector(BootEntry *bootentry, int xmpl_debug)
   bootentry->BPB_SecPerTrk = 32;
   bootentry->BPB_NumHeads = 64;
   bootentry->BPB_HiddSec = 0;
-  //8192 = 2Tb with 64 Sec/Clus
-  //Subtract 3 for the reserved area and space taken by fats
-  //Practical maximum is 8189
-  bootentry->BPB_FATSz32 = 8189;
+  bootentry->BPB_FATSz32 = FAT32_FAT_Table_Length;
   //This is calculated based on the maximum available with the given FATSize
   uint32_t datasize = bootentry->BPB_FATSz32 *
                       bootentry->BPB_SecPerClus * (bootentry->BPB_BytsPerSec / 4);
