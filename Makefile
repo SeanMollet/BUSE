@@ -10,13 +10,13 @@ LDFLAGS		:= -L. -lbuse
 .PHONY: all clean
 all: $(TARGET)
 
-$(TARGET): %: %.o $(STATIC_LIB)
+$(TARGET): %: %.o $(STATIC_LIB) setup.h
 	$(CC) -o $@ $< $(LDFLAGS)
 
-$(TARGET:=.o): %.o: %.c buse.h
+$(TARGET:=.o): %.o: %.c buse.h setup.h
 	$(CC) $(CFLAGS) -o $@ -c $<
 
-$(STATIC_LIB): $(LIBOBJS)
+$(STATIC_LIB): $(LIBOBJS) setup.h
 	ar rc $(STATIC_LIB) $(LIBOBJS)
 
 $(LIBOBJS): %.o: %.c
