@@ -31,6 +31,28 @@ given path. When complete, it will say:
 Once this is done, /dev/nbd0 will appear as a 2TB HDD, with a single 2TB 
 partition formatted FAT32 containing all the files inside /path/to/export
 
+## Sizing
+The size of the synthetic disk depends upon two settings in setup.h:
+    
+    Fat32_Sectors_per_Cluster
+    FAT32_FAT_Table_Length
+    
+Ideally, adjust the size only with the Sectors_per_Cluster. 
+The following are possible values and the resulting disk size:
+
+    SecPerClus	Disk Size (G)	Fat Size (Mb)
+    1	        0.5	            4
+    2       	2	            8
+    4	        8	            16
+    8	        32	            32
+    16	        128	            64
+    32	        512	            128
+    64	        2048	        256
+
+If this isn't fine grain enough for your application, you can also adjust the FAT_Table_Length, which will also adjust the final size proportionally to the adjustment made. Reducing this value by 50% will shrink the disk to 50% of the above size.
+
+Note that even though the disk is virtual, the filesystem elements must be generated and kept in RAM. Larger sized disks require more space for the filesystem elements, as noted in the Fat Size column of the above table. Additionally, RAM is required for keeping track of filenames and the memory map of the system. Both the filenames and memory map grow proportionally with the number of files on the hosted filesystem. In short, use the smallest disk size you can in order to save RAM for the filenames and memory mapping.
+
 ## USB Device Mode
 
 Thanks to By Andrew Mulholland (gbaman) and his Gist at 
