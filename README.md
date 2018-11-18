@@ -2,7 +2,7 @@
 
 This program generates a synthetic FAT32 filesystem given a directory on the 
 local system. The primary purpose of such an arrangement is to export the FS
-via usb-host mode to a physical device that is incapable of connecting to
+via Linux usb gadgets to a physical device that is incapable of connecting to
 a network drive.
 
 This FS is read-only, limited to 2TB of total size and 4GB maximum file sizes,
